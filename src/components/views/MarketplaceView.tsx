@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Check,
   CheckCircle2,
   Clock,
   Coins,
+  Copy,
   ExternalLink,
+  Layers,
   Loader2,
   Rocket,
   Send,
@@ -13,6 +16,7 @@ import {
   Sparkles,
   Wallet,
   XCircle,
+  Zap,
 } from "lucide-react";
 import type {
   BrandProfile,
@@ -50,13 +54,35 @@ export function MarketplaceView({
   const [redeeming, setRedeeming] = useState(false);
   const [historyTab, setHistoryTab] = useState<"orders" | "ledger">("orders");
   const [showCnManaged, setShowCnManaged] = useState(false);
+  const [blastIds, setBlastIds] = useState<string[]>([]);
+  const [blasting, setBlasting] = useState(false);
+  const [blastReport, setBlastReport] = useState<{
+    netCharged: number;
+    totalRefunded: number;
+    results: Array<{
+      orderId: string;
+      platformName: string;
+      region: string;
+      status: "published" | "failed";
+      publishedUrl: string;
+      message: string;
+    }>;
+    proofMarkdown: string;
+  } | null>(null);
+  const [copiedProof, setCopiedProof] = useState(false);
 
   const loadMarketplace = useCallback(async () => {
     const res = await fetch("/api/marketplace");
     if (!res.ok) return;
     const data = await res.json();
+    const fetchedAccounts: PlatformAccount[] = data.accounts || [];
     setCredits(data.creditsBalance ?? 0);
-    setAccounts(data.accounts || []);
+    setAccounts(fetchedAccounts);
+    setBlastIds((prev) =>
+      prev.length > 0
+        ? prev.filter((id) => fetchedAccounts.some((a) => a.id === id && a.deliveryMode === "auto_api"))
+        : fetchedAccounts.filter((a) => a.deliveryMode === "auto_api").map((a) => a.id)
+    );
     setOrders(data.orders || []);
     setTransactions(data.transactions || []);
     setLoading(false);
@@ -112,6 +138,56 @@ export function MarketplaceView({
     } finally {
       setSubmittingId(null);
     }
+  };
+
+  const handleGlobalBlast = async () => {
+    if (!selectedArticle) {
+      onNotify("请先在「GEO 创作工坊」生成至少一篇文章", "error");
+      return;
+    }
+    if (blastIds.length === 0) {
+      onNotify("请至少勾选 1 个全球官方 API 渠道", "error");
+      return;
+    }
+    setBlasting(true);
+    try {
+      const res = await fetch("/api/marketplace/blast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleId: selectedArticle.id,
+          platformAccountIds: blastIds,
+          customerNote,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "全网联发失败");
+      setBlastReport({
+        netCharged: data.netCharged,
+        totalRefunded: data.totalRefunded,
+        results: data.results || [],
+        proofMarkdown: data.proofMarkdown || "",
+      });
+      await Promise.all([loadMarketplace(), onRefreshGlobal()]);
+      const okCount = (data.results || []).filter(
+        (r: { status: string }) => r.status === "published"
+      ).length;
+      onNotify(
+        `全网联发完成！成功上线 ${okCount}/${(data.results || []).length} 个全球官方渠道（实扣 ${data.netCharged} 积分）`
+      );
+    } catch (err) {
+      onNotify(err instanceof Error ? err.message : "全网联发失败", "error");
+    } finally {
+      setBlasting(false);
+    }
+  };
+
+  const handleCopyProof = async () => {
+    if (!blastReport?.proofMarkdown) return;
+    await navigator.clipboard.writeText(blastReport.proofMarkdown);
+    setCopiedProof(true);
+    onNotify("已复制 Markdown 客户交付外链证明报告！");
+    setTimeout(() => setCopiedProof(false), 2000);
   };
 
   const handleRedeemCredits = async (e: React.FormEvent) => {
@@ -316,12 +392,154 @@ export function MarketplaceView({
           );
         };
 
+        const selectedAuto = autoApiAccounts.filter((a) => blastIds.includes(a.id));
+        const rawSum = selectedAuto.reduce((s, a) => s + a.creditCost, 0);
+        const hasBundleDiscount = selectedAuto.length >= 2;
+        const discountedSum = hasBundleDiscount
+          ? selectedAuto.reduce((s, a) => s + Math.round(a.creditCost * 0.8), 0)
+          : rawSum;
+
         return (
           <div className="space-y-5">
+            {/* One-Click Global Multi-Channel Blast Pack */}
+            {autoApiAccounts.length >= 2 && (
+              <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-white to-emerald-50/70 p-5 shadow-xs">
+                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-2.5 py-0.5 text-[11px] font-bold text-white">
+                      <Zap className="h-3 w-3" />
+                      机构与出海团队爆款 · 立省 20% 积分
+                    </div>
+                    <h2 className="mt-2 flex items-center gap-2 text-base font-extrabold text-slate-900">
+                      <Layers className="h-4 w-4 text-indigo-600" />
+                      一键全网官方 API 同步联发包（Global Multi-Channel Auto-Blast）
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-600">
+                      1 次点击并行铺发至所选海外高权重官方 API，秒级生成多平台信源共现并输出可发给客户的 Markdown 外链交付报告；任一单渠道失败自动按比例原路退款。
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-left lg:text-right">
+                    <div className="flex items-baseline gap-2 lg:justify-end">
+                      {hasBundleDiscount && (
+                        <span className="text-xs font-semibold text-slate-400 line-through">
+                          原价 {rawSum} 积分
+                        </span>
+                      )}
+                      <span className="text-2xl font-black text-indigo-700">{discountedSum}</span>
+                      <span className="text-xs font-bold text-slate-500">积分</span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={blasting || !selectedArticle || selectedAuto.length === 0}
+                      onClick={() => void handleGlobalBlast()}
+                      className="mt-2 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {blasting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Rocket className="h-3.5 w-3.5" />
+                      )}
+                      {blasting
+                        ? "正在并行推送至全球官方 API..."
+                        : `一键联发至 ${selectedAuto.length} 个官方平台（${discountedSum} 积分）`}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {autoApiAccounts.map((acc) => {
+                    const checked = blastIds.includes(acc.id);
+                    return (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        onClick={() =>
+                          setBlastIds((prev) =>
+                            prev.includes(acc.id)
+                              ? prev.filter((x) => x !== acc.id)
+                              : [...prev, acc.id]
+                          )
+                        }
+                        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                          checked
+                            ? "border-indigo-500 bg-indigo-600 text-white"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
+                        }`}
+                      >
+                        <span>{checked ? "✓" : "+"}</span>
+                        <span>{acc.name.split("·")[0].trim()}</span>
+                        <span className={checked ? "text-indigo-200" : "text-slate-400"}>
+                          ({acc.region || "Global"})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {blastReport && (
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-white p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs font-bold text-emerald-800">
+                        本次全网联发交付矩阵（实扣 {blastReport.netCharged} 积分
+                        {blastReport.totalRefunded > 0
+                          ? `，失败渠道已自动退还 ${blastReport.totalRefunded} 积分`
+                          : ""}
+                        ）
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyProof()}
+                        className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-600"
+                      >
+                        {copiedProof ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        复制客户交付外链报告（Markdown）
+                      </button>
+                    </div>
+                    <div className="mt-3 space-y-1.5">
+                      {blastReport.results.map((r) => (
+                        <div
+                          key={r.orderId}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-bold ${
+                                r.status === "published" ? "text-emerald-700" : "text-rose-600"
+                              }`}
+                            >
+                              {r.status === "published" ? "✅ 已上线" : "❌ 失败已退分"}
+                            </span>
+                            <span className="font-semibold text-slate-800">{r.platformName}</span>
+                          </div>
+                          {r.publishedUrl ? (
+                            <a
+                              href={r.publishedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-indigo-600 underline"
+                            >
+                              {r.publishedUrl}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-rose-600">{r.message}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-bold text-slate-900">
-                  第二步：全球高权重官方 API 全自动通道（{autoApiAccounts.length} 个已就绪 · 秒级上线返链接）
+                  第二步：单渠道按需直发（{autoApiAccounts.length} 个全球官方 API 已就绪 · 秒级上线返链接）
                 </h2>
                 <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
                   支持 ChatGPT Search / Perplexity / Google AIO / DeepSeek

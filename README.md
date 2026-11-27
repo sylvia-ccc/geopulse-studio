@@ -1,149 +1,109 @@
----
-title: GeoPulse Studio
-emoji: 🚀
-colorFrom: indigo
-colorTo: green
-sdk: docker
-app_port: 3000
-pinned: false
-license: mit
-short_description: Open-Source GEO (AI Search Optimization) Studio
----
+# 🚀 GeoPulse Studio (v4.2 Global)
 
-# 🚀 GeoPulse Studio 4.0 — 智引 GEO 商用生成式引擎优化与托管代发平台
+**The Open-Source, Full-Stack Commercial GEO (Generative Engine Optimization) & Global Official-API Auto-Syndication Platform.**
 
-> **Open-Source Commercial Generative Engine Optimization (GEO / AEO) SaaS & Managed Publishing Platform**
-> Built for SMBs, Solo Founders, Content Teams & Digital Agencies to architect, audit, distribute via managed high-authority accounts, and track brand visibility across **Doubao/Yuanbao, DeepSeek/Kimi/Metaso, ChatGPT Search, Perplexity, and Google AI Overviews (Gemini)**.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-geo.workagentpro.com-4f46e5?style=for-the-badge)](https://geo.workagentpro.com)
+[![Free AI Audit](https://img.shields.io/badge/Free%203s%20Audit-%2Faudit-10b981?style=for-the-badge)](https://geo.workagentpro.com/audit)
+[![Hugging Face Space](https://img.shields.io/badge/Hugging%20Face-Interactive%20Space-f59e0b?style=for-the-badge)](https://huggingface.co/spaces/sylviacccyu/geopulse-studio)
+[![License: MIT](https://img.shields.io/badge/License-MIT-0f172a?style=for-the-badge)](./LICENSE)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-indigo.svg)](LICENSE)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
-[![Node.js 24](https://img.shields.io/badge/Node.js-24%20(built--in%20SQLite)-339933)](https://nodejs.org)
-[![Docker Ready](https://img.shields.io/badge/Docker-Production%20Ready-2496ED)](Dockerfile)
+> **Stop paying \$499–\$1,500+/month for passive AI visibility dashboards.**
+> GeoPulse Studio combines **Website AI Crawler Auditing**, **5-Engine × 8-Dimension GEO Content Scoring & Auto-Fix**, **Native SSR `/llms.txt` + 4-in-1 JSON-LD Hosting**, **Competitor Share-of-Voice (SOV) Tracking**, **White-Label Agency PDF Reports**, and **One-Click Official-API Global Syndication** — all MIT open-source and deployable on a single \$5/mo VPS with Docker.
 
-### 🔗 Live Demos & Links
-- **Official Live Commercial Site (HTTPS)**: https://geo.workagentpro.com *(Demo Admin: `demo@geopulse.ai` / `Demo123456!` · 1-Click Login Available)*
-- **Free No-Login GEO Grader Tool**: https://geo.workagentpro.com/audit
-- **Public GEO Hub & AI Index**: https://geo.workagentpro.com/hub · https://geo.workagentpro.com/llms.txt
-- **GitHub Repository**: https://github.com/sylvia-ccc/geopulse-studio
-- **Hugging Face Space**: https://huggingface.co/spaces/sylviacccyu/geopulse-studio
-
-### 🆕 What's New in v4.0
-- **Managed Multi-Platform Publishing Marketplace (`/app` → 托管代发市场)**: Customers without their own accounts can pay publishing credits to publish articles through platform-owned high-authority channels (auto-API channels like GeoPulse Hub / WordPress / Dev.to / Webhook publish instantly; Zhihu / WeChat / Xiaohongshu go through a compliant human-review order queue with automatic full credit refund on rejection).
-- **Publishing Credits Wallet & Credit Top-Up Codes (`GP-CRD-XXXX-XXXX`)**: Full credit transaction ledger, bonus credits on Pro/Enterprise activation, and admin batch credit-code minting for instant pay-per-post monetization.
-- **Admin Multi-Platform Account Pool & Order Fulfillment Desk**: Connect your own WordPress, Dev.to, Webhook, and vertical review accounts (AES-256-GCM encrypted credentials), 1-click copy channel-formatted drafts, and return live published URLs.
-- **Official Dogfooding GEO Growth Pack**: 1-click publishes 3 high-scoring flagship GEO articles promoting GeoPulse Studio itself onto `/p/[slug]` & `/llms.txt` so AI engines start recommending your platform organically.
+[Live Production App](https://geo.workagentpro.com) · [Free Website AI Crawler Audit](https://geo.workagentpro.com/audit) · [Live `/llms.txt` Index](https://geo.workagentpro.com/llms.txt) · [Commercial & Acquisition Info](./COMMERCIAL_AND_ACQUISITION.md)
 
 ---
 
-## ✨ Why GeoPulse Studio? (Benchmarked Against Top Commercial GEO Tools)
+## ✨ Why GeoPulse Studio? (2026 Market Comparison)
 
-Most GEO tools charge **$99–$1,500/month** just for monitoring. **GeoPulse Studio 2.0** combines **monitoring + weight-driven content architecture + real-time 8-dimension auditing + AI-crawler publishing infrastructure + ready-to-monetize SaaS licensing** in a single self-hostable zero-dependency stack.
+In 2025–2026, enterprise platforms acquired monitoring-only GEO tools at massive valuations (HubSpot → XFunnel, Sitecore → Scrunch AI, Adobe → Semrush), leaving SMBs, SaaS founders, and boutique agencies with **expensive read-only dashboards** that still fail to fix sites or publish structured content.
 
-| Capability | GeoPulse Studio 2.0 | Profound / Peec AI | Scrunch AI | Otterly.ai |
-| :--- | :---: | :---: | :---: | :---: |
-| **5 Major AI Engines × 8-Dim Weight Matrix** (CN + Global) | ✅ Customizable Sliders | Monitoring Only | Partial | Monitoring Only |
-| **URL Auto-Ingest Brand Entity Builder** | ✅ 1-Click | ✅ | ✅ | Manual |
-| **Live Website AI-Crawler Audit** (`robots.txt`/`llms.txt`/JSON-LD/SSR) | ✅ Built-in + Fix Snippets | ❌ | ✅ | ❌ |
-| **Real-Time GEO Content Auditor & 1-Click Optimizer** | ✅ 8-Dim + 6 Auto-Fixes | ❌ | Partial | ❌ |
-| **Batch Matrix Generator + Existing Article Import** | ✅ 3–6x Batch + Rewrite | ❌ | ❌ | ❌ |
-| **Competitor Share of Voice (SOV) & Citation Domains** | ✅ + 12 Funnel Prompts | ✅ | Partial | ✅ |
-| **Native SSR GEO Hub (`/p/[slug]`, `/llms.txt`, `/sitemap.xml`)** | ✅ Auto-Generated | ❌ | Partial | ❌ |
-| **Multi-Channel Adapter (Zhihu/WeChat/XHS/CSDN/Webhook)** | ✅ Built-in | ❌ | ❌ | ❌ |
-| **White-Label Client Delivery Report (PDF/HTML)** | ✅ 1-Click Export | Enterprise Only | Enterprise Only | ❌ |
-| **Self-Host Commercial SaaS (License Codes + Admin + BYOK Vault)** | ✅ Open-Source Ready | Closed SaaS | Closed SaaS | Closed SaaS |
+| Capability | **GeoPulse Studio 4.2** | Profound | Scrunch AI | Peec AI | Otterly.ai |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **License & Pricing** | **MIT Open-Source (\$0) / Cloud \$0–\$39/mo** | \$499–\$1,500+/mo | Enterprise custom | \$99–\$399/mo | \$29–\$189/mo |
+| **Free Website AI Crawler Audit** | ✅ 6 AI bots, `/llms.txt`, SSR, JSON-LD (`/audit`) | ❌ | ✅ | ❌ | ❌ |
+| **8-Dim GEO Scoring & 6-Click Auto-Fix** | ✅ Real-time bilingual (EN + ZH) | ❌ | ⚠️ Advice only | ❌ | ❌ |
+| **Native SSR `/llms.txt` + 4-in-1 JSON-LD** | ✅ Built-in `/p/[slug]`, `/hub`, `/sitemap.xml` | ❌ | ⚠️ Proxy | ❌ | ❌ |
+| **1-Click Official-API Global Syndication** | ✅ DEV.to, Bluesky, GitHub Pages, Qiita, Telegraph, Ghost, WP | ❌ | ❌ | ❌ | ❌ |
+| **BYOK LLM + Zero-Key Prompt Packs** | ✅ 9 Providers (OpenAI, Gemini, DeepSeek, OpenRouter, etc.) | Closed | Closed | Closed | Closed |
+| **White-Label Agency Billing & Credits** | ✅ Multi-tenant, Redemption Codes, Credits Wallet, PDF Reports | Enterprise | Enterprise | Agency tier | ❌ |
+| **Global + China AI Engines** | ✅ ChatGPT, Perplexity, Gemini + DeepSeek, Kimi, Doubao | EN only | EN only | EN only | EN only |
 
 ---
 
-## 🧠 Architecture Overview
+## ⚡ Live Proof: Global Official-API Auto-Syndication in Action
+
+GeoPulse Studio 4.2 uses **100% official platform APIs** (zero fragile scraping, zero ban risk, AES-256-GCM encrypted credentials) with automatic `canonical_url` attribution and proportional credit refunds if any endpoint fails:
+
+- **Primary SSR Hub (`/llms.txt` + 4-in-1 JSON-LD)**: [geo.workagentpro.com/p/2026-best-open-source-geo-tools-profound-otterly-alternative](https://geo.workagentpro.com/p/2026-best-open-source-geo-tools-profound-otterly-alternative)
+- **DEV.to Official REST API (US/EU, DA 85+)**: [dev.to/geopulse_research](https://dev.to/geopulse_research/2026-best-open-source-geo-tools-compared-geopulse-studio-vs-profound-vs-peec-ai-vs-otterlyai-33ak)
+- **GitHub Pages Official Contents API (Global, DA 96+)**: [sylvia-ccc.github.io/geopulse-geo-hub](https://sylvia-ccc.github.io/geopulse-geo-hub/articles/2026-best-open-source-geo-tools-profound-otterly-alternative.html)
+- **Bluesky Official ATProto API (US/EU Tech)**: [bsky.app/@sylviacccyu.bsky.social](https://bsky.app/profile/sylviacccyu.bsky.social/post/3n3btmgo5nr2v)
+- **Telegraph Official API (Global Mirror)**: [telegra.ph live mirror](https://telegra.ph/2026-Best-Open-Source-GEO-Tools-Compared-GeoPulse-Studio-vs-Profound-vs-Peec-AI-vs-Otterlyai-11-27)
+- **Also Supported Out-of-the-Box**: Qiita REST API v2 (Japan), Ghost CMS Official Admin API (HS256 JWT), Hashnode GraphQL API, WordPress REST API, and Custom Webhooks.
+
+---
+
+## 🏗️ System Architecture
 
 ```mermaid
-flowchart TD
-    User["SMB / Creator / Agency"] --> UI["GeoPulse Studio 2.0 Web Console\n(Next.js 15 App Router + Tailwind CSS)"]
-    UI --> API["Hardened REST API\n(Rate Limit · SSRF Guard · API Key · AES-256-GCM Vault)"]
-
-    subgraph Core["GEO Core Engine"]
-        Ingest["URL Auto-Ingest & Brand Entity Builder"]
-        Weights["5 AI Engines × 8-Dim Weight Matrix"]
-        Composer["Weight-Driven Composer\n(BYOK LLM / Server LLM Pool / Zero-Config Engine)"]
-        Scorer["Real-Time 8-Dim Scorer & 1-Click Optimizer"]
-        SiteAudit["Live Website AI-Crawler Technical Auditor"]
-    end
-
-    API --> Core
-    Core --> DB[("SQLite (Node 24 built-in)\nZero External DB Setup")]
-
-    subgraph Publish["Publishing & AI Indexing Layer"]
-        Hub["SSR Public GEO Hub /p/[slug] + JSON-LD"]
-        Crawler["/llms.txt · /llms-full.txt · /sitemap.xml · /robots.txt"]
-        Channels["Multi-Platform Adapter\n(Zhihu / WeChat / Xiaohongshu / CSDN / HTML)"]
-        Webhook["Webhook / WordPress / CMS Push + Audit Logs"]
-    end
-
-    API --> Publish
+flowchart LR
+  U["Founders & Agencies"] --> A["No-Login AI Crawler Audit (/audit)"]
+  U --> W["Workspace: Brand Entity + 8-Dim GEO Editor"]
+  W --> LLM["9-Provider BYOK Vault (AES-256-GCM) / Zero-Key Prompt Pack"]
+  W --> HUB["Native SSR Hub (/p/[slug] + /llms.txt + JSON-LD)"]
+  W --> BLAST["1-Click Global Auto-Blast (20% Bundle + Auto-Refund)"]
+  BLAST --> DEV["DEV.to REST API"]
+  BLAST --> BSKY["Bluesky ATProto API"]
+  BLAST --> GHP["GitHub Pages API"]
+  BLAST --> QIITA["Qiita API v2"]
+  BLAST --> TG["Telegraph / Ghost / WP"]
+  HUB --> CRAWL["ChatGPT Search · Perplexity · Google AIO · DeepSeek · Doubao"]
 ```
 
 ---
 
-## 🎯 Core Commercial Features（核心商业价值）
+## 🚀 Quick Start (5 Minutes)
 
-1. **极简品牌建档 + 官网 URL 一键抓档**：输入官网链接自动提取品牌定位、卖点、价格与实测证据；支持一键导出**白标客户交付报告（HTML / 打印 PDF）**。
-2. **5 大 AI 引擎 × 8 维权重矩阵**：覆盖 **豆包/元宝、DeepSeek/Kimi/秘塔、ChatGPT Search、Perplexity、Google AI Overviews**，支持自由拖动 8 维权重滑块调整文章架构与打分权重。
-3. **三合一 GEO 创作工坊**：
-   - 单篇选题蓝图 + 高权重生文
-   - 一键批量生成 3 篇核心矩阵（对比评测 + 选型清单 + FAQ）
-   - 已有旧文粘贴体检与一键补全提权 + 实时渲染预览
-4. **官网 AI 爬虫技术体检**：实测 6 大 AI 爬虫（`GPTBot`、`OAI-SearchBot`、`PerplexityBot`、`ClaudeBot`、`Google-Extended`、`Bytespider`）权限、`/llms.txt`、SSR 与 JSON-LD，附可复制修复代码。
-5. **AI 收录监测与竞品声量份额（SOV）**：追踪品牌提及率、同场竞品声量占比、高频被引来源域名分布、AI 幻觉预警，以及一键生成 12 条买方全漏斗提问词库。
-6. **原生 AI 爬虫托管专栏 + 多渠道分发**：SSR 公开页 `/p/[slug]` 自动挂载四合一 JSON-LD，动态更新 `/llms.txt`、`/llms-full.txt`、`/sitemap.xml`、`/robots.txt`；一键适配知乎、公众号 HTML、小红书、CSDN/掘金与 Webhook 自动推送。
-7. **完整商用 SaaS 变现底座**：内置账号鉴权、三档套餐配额、管理员「商用运营后台」批量发码（`GP-PRO-XXXX-XXXX`）、服务端全局 LLM 算力池、BYOK `AES-256-GCM` 密钥加密保险箱、SSRF 防护与接口限流。
-
----
-
-## ⚡ Quick Start（快速启动）
-
-Requires **Node.js >= 22.13** (Node 24 recommended — uses built-in `node:sqlite` with zero external database setup).
+### Option 1: Docker (Recommended for Production)
 
 ```bash
 git clone https://github.com/sylvia-ccc/geopulse-studio.git
 cd geopulse-studio
+cp .env.example .env
+# Edit .env and set a 32+ char SESSION_SECRET and your APP_URL
+docker build -t geopulse-studio .
+docker run -d --name geopulse-studio --restart unless-stopped \
+  -p 3000:3000 --env-file .env -v $(pwd)/data:/app/data geopulse-studio
+```
+
+### Option 2: Local Development (Node 22+)
+
+```bash
 npm install
-cp .env.example .env
-npm run dev
+npm test       # 28 automated unit & integration tests (Vitest)
+npm run dev    # http://localhost:3000 (1-click demo at /login?demo=1)
 ```
-
-Open `http://localhost:3000`:
-- **Demo Admin**: `demo@geopulse.ai` / `Demo123456!` *(or click "一键进入演示工作台")*
-- **Sample Activation Codes**: `GP-PRO-2026-DEMO` (Pro 30d), `GP-ENT-2026-VIP1` (Enterprise 365d)
 
 ---
 
-## 🚢 Production Server Deployment（自有服务器一键部署）
+## 💼 Commercial Licensing, White-Label Agency & Acquisition
 
-### Option A: One-Command VPS Deploy + Automatic HTTPS (Caddy)
-```bash
-DOMAIN=geo.yourdomain.com ADMIN_EMAIL=you@yourdomain.com bash deploy/deploy.sh
-```
+GeoPulse Studio is engineered to be **monetization-ready on Day 1** (multi-tenant auth, subscription redemption codes, pay-as-you-go publishing credits wallet, admin fulfillment desk, zero-code site/checkout configuration, and white-label client PDF reports).
 
-### Option B: Docker Compose (Standalone Port / Existing Nginx)
-```bash
-cp .env.example .env
-# Edit NEXT_PUBLIC_APP_URL, SESSION_SECRET, ADMIN_EMAIL
-docker compose up -d --build
-```
-See [deploy/nginx.conf](deploy/nginx.conf) for reverse-proxy setup and [deploy/backup-db.sh](deploy/backup-db.sh) for automated daily SQLite online backups.
+- **SEO / GEO Agencies**: Deploy under your own domain & brand to power \$2,000–\$10,000/mo GEO retainers.
+- **SaaS Builders & Strategic Acquirers**: Full IP ownership, clean TypeScript/Next.js 15 codebase, zero external database dependencies (embedded SQLite), and verified live production deployment. See [COMMERCIAL_AND_ACQUISITION.md](./COMMERCIAL_AND_ACQUISITION.md) or open a GitHub Issue / contact `sylviacccyu@gmail.com` for white-label licensing or acquisition inquiries.
 
 ---
 
-## 💼 Commercialization & Acquisition Inquiries（商业合作与源码定制）
+## 🇨🇳 中文简介（GeoPulse Studio 4.2 智引 GEO 全球商用版）
 
-This repository is MIT-licensed for community use, self-hosting, and evaluation. For commercial white-label deployment, multi-tenant enterprise licensing, custom AI crawler integrations, or acquisition inquiries, please open a GitHub Discussion / Issue or contact the repository owner.
+面向中小企业、出海团队、独立开发者与代运营机构的开源商用 **GEO（生成式引擎优化）** 与 **全球官方 API 全自动分发平台**：
+- **五大 AI 引擎 × 8 维权重矩阵**：同时覆盖豆包/元宝、DeepSeek/Kimi/秘塔、ChatGPT Search、Perplexity 与 Google AI Overviews；
+- **免登录官网 GEO 秒测（`/audit`）**：3 秒检测 6 大 AI 爬虫放行状态、`/llms.txt`、SSR 字数与四合一 JSON-LD；
+- **一键全网官方 API 联发包（立省 20% 积分）**：支持 DEV.to、Bluesky、GitHub Pages、Qiita、Telegraph、Ghost JWT、WordPress 官方 API 自动直发，自动生成可发给客户的 Markdown 外链交付报告，单渠道失败自动原路退积分；
+- **零门槛商用变现闭环**：内置多租户配额、套餐激活码 + 积分充值码发卡后台、站长多账号池（AES-256-GCM 加密）与白标 PDF 客户报告。
 
----
+## 📄 License
 
-## 🧪 Testing & Verification
-
-```bash
-npm test            # Run all Vitest unit tests (16 tests)
-npx tsc --noEmit    # Strict TypeScript check
-npm run build       # Production build
-```
+MIT © 2026 GeoPulse Studio Contributors

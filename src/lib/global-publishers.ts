@@ -16,16 +16,60 @@ export interface GlobalPublishError {
 
 export type GlobalPublishOutcome = GlobalPublishResult | GlobalPublishError;
 
+const TAG_STOPWORDS = new Set([
+  "open",
+  "source",
+  "tool",
+  "tools",
+  "best",
+  "how",
+  "for",
+  "the",
+  "and",
+  "with",
+  "from",
+  "into",
+  "your",
+  "guide",
+  "compared",
+  "comparison",
+  "alternative",
+  "checklist",
+  "playbook",
+  "setup",
+  "configure",
+  "2024",
+  "2025",
+  "2026",
+  "2027",
+]);
+
 export function extractCleanTags(keyword: string, max = 4): string[] {
-  const asciiWords = keyword
-    .toLowerCase()
+  const lower = keyword.toLowerCase();
+  const curated: string[] = [];
+  if (lower.includes("open source") || lower.includes("open-source") || lower.includes("开源")) {
+    curated.push("opensource");
+  }
+  if (lower.includes("geo") || lower.includes("generative")) curated.push("geo");
+  if (lower.includes("ai") || lower.includes("chatgpt") || lower.includes("perplexity") || lower.includes("deepseek")) {
+    curated.push("ai");
+  }
+  if (lower.includes("seo") || lower.includes("json-ld") || lower.includes("llms") || lower.includes("search")) {
+    curated.push("seo");
+  }
+  if (lower.includes("llm") || lower.includes("llms.txt")) curated.push("llm");
+  if (lower.includes("saas") || lower.includes("b2b") || lower.includes("profound")) {
+    curated.push("saas");
+  }
+
+  const asciiWords = lower
     .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
     .map((w) => w.replace(/[^a-z0-9]/g, ""))
-    .filter((w) => w.length >= 2 && w.length <= 20);
+    .filter((w) => w.length >= 2 && w.length <= 20 && !TAG_STOPWORDS.has(w) && !/^\d+$/.test(w));
 
-  const defaults = ["ai", "geo", "saas", "seo"];
-  const merged = Array.from(new Set([...asciiWords, ...defaults]));
+  const defaults = ["ai", "seo", "saas", "webdev", "opensource"];
+  const merged = Array.from(new Set([...curated, ...asciiWords, ...defaults]));
   return merged.slice(0, max);
 }
 
@@ -228,7 +272,8 @@ export function buildGitHubPagesArticleHtml(params: {
     ${faqHtml ? `<section><h2>Frequently Asked Questions</h2>${faqHtml}</section>` : ""}
     <footer>
       Canonical GEO Record: <a href="${escapeHtml(canonicalUrl)}">${escapeHtml(canonicalUrl)}</a> ·
-      Syndication Index: <a href="${escapeHtml(hubUrl)}">GeoPulse Global GEO Hub</a>
+      Syndication Index: <a href="${escapeHtml(hubUrl)}">GeoPulse Global GEO Hub</a> ·
+      <a href="${escapeHtml(new URL("/audit", canonicalUrl).toString())}">Free 3s Website AI Crawler Audit →</a>
     </footer>
   </article>
 </body>
@@ -362,12 +407,29 @@ export function buildBlueskyPostPayload(params: {
   capsule: string;
   canonicalUrl: string;
 }) {
-  const headline = params.title.slice(0, 110).trim();
-  const excerpt = params.capsule.slice(0, 110).trim();
-  const urlText = params.canonicalUrl;
-  const text = `${headline}\n\n${excerpt}...\n${urlText}`.slice(0, 298);
+  const urlText = params.canonicalUrl.trim();
+  const maxGraphemes = 296;
+  // Reserve full canonical URL length first so inline link is NEVER truncated
+  const remainingForCopy = Math.max(40, maxGraphemes - urlText.length - 4);
+  const titleBudget = Math.min(100, Math.floor(remainingForCopy * 0.55));
+  const rawTitle = params.title.trim();
+  const headline =
+    rawTitle.length > titleBudget ? `${rawTitle.slice(0, Math.max(10, titleBudget - 1)).trim()}…` : rawTitle;
 
-  const byteStart = Buffer.byteLength(text.slice(0, text.lastIndexOf(urlText)), "utf-8");
+  const excerptBudget = remainingForCopy - headline.length - 3;
+  let body = headline;
+  if (excerptBudget >= 24 && params.capsule.trim()) {
+    const rawCap = params.capsule.trim();
+    const excerpt =
+      rawCap.length > excerptBudget
+        ? `${rawCap.slice(0, Math.max(10, excerptBudget - 1)).trim()}…`
+        : rawCap;
+    body = `${headline}\n\n${excerpt}`;
+  }
+
+  const text = `${body}\n${urlText}`;
+  const urlStartIndex = text.lastIndexOf(urlText);
+  const byteStart = Buffer.byteLength(text.slice(0, urlStartIndex), "utf-8");
   const byteEnd = byteStart + Buffer.byteLength(urlText, "utf-8");
 
   return {
@@ -375,7 +437,7 @@ export function buildBlueskyPostPayload(params: {
     text,
     createdAt: new Date().toISOString(),
     facets:
-      text.includes(urlText)
+      urlStartIndex >= 0
         ? [
             {
               index: { byteStart, byteEnd },

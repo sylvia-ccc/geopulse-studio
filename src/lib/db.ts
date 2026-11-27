@@ -1327,7 +1327,8 @@ const DEFAULT_SITE_SETTINGS: Omit<CommercialSiteSettings, "strictBilling"> = {
   checkoutProUrl: "",
   checkoutEnterpriseUrl: "",
   acquisitionNote: "开放 MIT 社区版自托管，同时支持企业私有化定制与整站商业合作/收购洽谈。",
-  announcement: "GeoPulse Studio 3.0 正式上线：新增免登录 GEO 秒测、10 大模型一键接入与零 API Key 专家提示词模式！",
+  announcement:
+    "GeoPulse Studio 4.2 Global 上线：支持 DEV.to / Bluesky / GitHub Pages / Qiita / Telegraph 一键 6 平台官方 API 联发包（立省 20%）与免登录官网 GEO 体检！",
 };
 
 export function getCommercialSiteSettings(): CommercialSiteSettings {

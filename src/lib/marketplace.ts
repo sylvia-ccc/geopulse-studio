@@ -406,6 +406,191 @@ export async function submitDistributionOrder(params: {
   };
 }
 
+export interface GlobalBlastChannelResult {
+  orderId: string;
+  accountId: string;
+  platformName: string;
+  platformType: PlatformAccountType;
+  region: string;
+  status: "published" | "failed";
+  publishedUrl: string;
+  message: string;
+  creditsNet: number;
+}
+
+export async function submitGlobalBlastOrder(params: {
+  userId: string;
+  article: GeoArticle;
+  accounts: PlatformAccountWithSecret[];
+  customerNote?: string;
+  baseUrl: string;
+}): Promise<
+  | {
+      ok: true;
+      originalCost: number;
+      discountPercent: number;
+      netCharged: number;
+      totalRefunded: number;
+      balanceAfter: number;
+      results: GlobalBlastChannelResult[];
+      proofMarkdown: string;
+    }
+  | { ok: false; error: string }
+> {
+  const autoAccounts = params.accounts.filter((a) => a.enabled && a.deliveryMode === "auto_api");
+  if (autoAccounts.length === 0) {
+    return { ok: false, error: "请至少选择 1 个已上架的官方 API 自动直发渠道" };
+  }
+
+  const originalCost = autoAccounts.reduce((acc, a) => acc + a.creditCost, 0);
+  const discountFactor = autoAccounts.length >= 2 ? 0.8 : 1;
+  const discountPercent = autoAccounts.length >= 2 ? 20 : 0;
+
+  // Compute discounted cost per channel so failed channels get exact proportional refunds
+  const perChannelCost = autoAccounts.map((a) => Math.max(0, Math.round(a.creditCost * discountFactor)));
+  const totalBundleCost = perChannelCost.reduce((sum, c) => sum + c, 0);
+  const blastId = newId("blst");
+
+  const charge = adjustUserCredits({
+    userId: params.userId,
+    delta: -totalBundleCost,
+    reason: `一键全网联发包（${autoAccounts.length} 平台${discountPercent ? ` · ${discountPercent}% 折扣` : ""}）：${params.article.title.slice(0, 20)}`,
+    refId: blastId,
+  });
+  if (!charge.ok) {
+    return { ok: false, error: charge.error };
+  }
+
+  const brand = getBrandById(params.article.brandId);
+  const now = new Date().toISOString();
+  let totalRefunded = 0;
+  let latestBalance = charge.balanceAfter;
+
+  const settled = await Promise.all(
+    autoAccounts.map(async (account, idx): Promise<GlobalBlastChannelResult> => {
+      const orderId = newId("ord");
+      const channelFee = perChannelCost[idx];
+
+      getDb()
+        .prepare(
+          `INSERT INTO distribution_orders (
+            id, user_id, article_id, platform_account_id, platform_name, platform_type,
+            delivery_mode, credits_charged, status, published_url, customer_note, admin_note, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, 'auto_api', ?, 'pending_review', '', ?, '', ?, ?)`
+        )
+        .run(
+          orderId,
+          params.userId,
+          params.article.id,
+          account.id,
+          account.name,
+          account.platformType,
+          channelFee,
+          (params.customerNote || `Global Auto-Blast ${blastId}`).trim(),
+          now,
+          now
+        );
+
+      const dispatch = await dispatchAutoApiOrder({
+        article: params.article,
+        brand,
+        account,
+        baseUrl: params.baseUrl,
+      });
+
+      if (dispatch.ok) {
+        getDb()
+          .prepare(
+            `UPDATE distribution_orders SET status = 'published', published_url = ?, admin_note = ?, updated_at = ?
+             WHERE id = ?`
+          )
+          .run(dispatch.publishedUrl, dispatch.message, new Date().toISOString(), orderId);
+
+        createPublishLog(params.userId, {
+          articleId: params.article.id,
+          channelType: account.platformType,
+          channelName: account.name,
+          status: "success",
+          httpStatus: 200,
+          externalUrl: dispatch.publishedUrl,
+          message: dispatch.message,
+        });
+
+        return {
+          orderId,
+          accountId: account.id,
+          platformName: account.name,
+          platformType: account.platformType,
+          region: account.region || "Global",
+          status: "published",
+          publishedUrl: dispatch.publishedUrl,
+          message: dispatch.message,
+          creditsNet: channelFee,
+        };
+      }
+
+      if (channelFee > 0) {
+        const refund = adjustUserCredits({
+          userId: params.userId,
+          delta: channelFee,
+          reason: `联发包单渠道失败自动退款：${account.name}`,
+          refId: orderId,
+        });
+        if (refund.ok) {
+          totalRefunded += channelFee;
+          latestBalance = refund.balanceAfter;
+        }
+      }
+
+      getDb()
+        .prepare(
+          `UPDATE distribution_orders SET status = 'failed', admin_note = ?, updated_at = ? WHERE id = ?`
+        )
+        .run(dispatch.error, new Date().toISOString(), orderId);
+
+      return {
+        orderId,
+        accountId: account.id,
+        platformName: account.name,
+        platformType: account.platformType,
+        region: account.region || "Global",
+        status: "failed",
+        publishedUrl: "",
+        message: dispatch.error,
+        creditsNet: 0,
+      };
+    })
+  );
+
+  const succeeded = settled.filter((r) => r.status === "published");
+  const proofLines = [
+    `# Global GEO Syndication Proof Report`,
+    `- **Article**: ${params.article.title}`,
+    `- **GEO Readiness Score**: ${params.article.geoScore}/100`,
+    `- **Canonical URL**: ${params.baseUrl.replace(/\/$/, "")}/p/${params.article.slug}`,
+    `- **Published Channels**: ${succeeded.length}/${settled.length} succeeded`,
+    `- **Generated At**: ${new Date().toISOString()}`,
+    ``,
+    `| Platform | Region | Status | Live URL |`,
+    `| :--- | :--- | :--- | :--- |`,
+    ...settled.map(
+      (r) =>
+        `| ${r.platformName} | ${r.region} | ${r.status === "published" ? "✅ Live" : "❌ Failed (Refunded)"} | ${r.publishedUrl || r.message} |`
+    ),
+  ];
+
+  return {
+    ok: true,
+    originalCost,
+    discountPercent,
+    netCharged: Math.max(0, totalBundleCost - totalRefunded),
+    totalRefunded,
+    balanceAfter: latestBalance,
+    results: settled,
+    proofMarkdown: proofLines.join("\n"),
+  };
+}
+
 export async function dispatchAutoApiOrder(params: {
   article: GeoArticle;
   brand: BrandProfile | null;

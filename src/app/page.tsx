@@ -20,7 +20,7 @@ import { PublicAuditWidget } from "@/components/PublicAuditWidget";
 export const dynamic = "force-dynamic";
 
 export default function LandingPage() {
-  const published = listPublishedArticles().slice(0, 3);
+  const published = listPublishedArticles().slice(0, 6);
   const siteConfig = getCommercialSiteSettings();
   const plans = Object.values(PLAN_QUOTAS);
 
@@ -98,7 +98,7 @@ export default function LandingPage() {
                 {siteConfig.brandTitle}
               </span>
               <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                GEO 3.0 商用版
+                GEO 4.2 Global
               </span>
             </div>
           </Link>
@@ -186,16 +186,47 @@ export default function LandingPage() {
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-500">
               <span className="inline-flex items-center gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                10 大国内外模型一键接入（含智谱/硅基流动/Gemini 免费档）
+                官方 API 一键联发：DEV.to · Bluesky · GitHub Pages · Qiita · Telegraph · Ghost · WP
               </span>
               <span className="inline-flex items-center gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                无 API Key 也能用：专家提示词包 + 回填自动解析
+                10 大模型 BYOK 加密直连 + 零 API Key 专家提示词包
               </span>
               <span className="inline-flex items-center gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                MIT 开源自托管 · 支持私有化部署与商业合作
+                MIT 开源可白标私有化 · 支持代运营机构定制与整站商业合作
               </span>
+            </div>
+          </div>
+
+          {/* Global Official Auto-API Distribution Strip */}
+          <div className="mx-auto mt-10 max-w-5xl rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="font-bold text-slate-700">
+                ⚡ 已原生打通全球高付费区官方 API 自动分发网络（支持 Canonical + JSON-LD + /llms.txt）：
+              </span>
+              <Link href="/login?demo=1" className="font-bold text-indigo-600 hover:underline">
+                进入托管代发市场体验一键联发 →
+              </Link>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                "🌍 GeoPulse SSR Hub (/llms.txt)",
+                "🇺🇸🇪🇺 DEV.to Official REST (DA 85+)",
+                "🇺🇸🇪🇺 Bluesky ATProto API",
+                "🌍 GitHub Pages API (DA 96+)",
+                "🇯🇵 Qiita Official API v2 (DA 88+)",
+                "🌍 Telegraph Instant Mirror",
+                "🇺🇸🇪🇺 Ghost Admin JWT",
+                "🌍 WordPress REST & Webhook",
+              ].map((ch) => (
+                <span
+                  key={ch}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700"
+                >
+                  {ch}
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -371,11 +402,14 @@ export default function LandingPage() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-4 flex items-baseline gap-1">
+                  <div className="mt-4 flex items-baseline gap-2">
                     <span className="text-4xl font-black text-slate-900">
                       ¥{plan.priceMonthlyCny}
                     </span>
                     <span className="text-sm text-slate-500">/ 月</span>
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
+                      {plan.tier === "free" ? "$0/mo" : plan.tier === "pro" ? "≈ $39/mo" : "≈ $149/mo"}
+                    </span>
                   </div>
                   <ul className="mt-6 space-y-2.5 text-sm text-slate-600">
                     <li className="flex items-center gap-2">

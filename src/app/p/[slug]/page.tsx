@@ -140,6 +140,33 @@ export default async function PublicGeoArticlePage(context: {
               </dl>
             </section>
           )}
+          {/* Bilingual PLG Conversion CTA (GEO-to-GEO Acquisition Flywheel) */}
+          <section className="mt-10 rounded-2xl border border-indigo-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+              Powered by GeoPulse Studio · Open-Source Commercial GEO Engine
+            </div>
+            <h2 className="mt-1.5 text-lg font-extrabold">
+              想让 ChatGPT Search、Perplexity、DeepSeek 与豆包主动推荐你的产品？
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-300">
+              Want AI search engines to cite your brand like this page? Run a free 3-second AI crawler audit (robots.txt + /llms.txt + JSON-LD) or syndicate your brand across 6 global official APIs in 1 click.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                href="/audit"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-emerald-400"
+              >
+                🔍 免费 3 秒官网 GEO 体检 / Free AI Audit →
+              </Link>
+              <Link
+                href="/login?demo=1"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/20"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                体验一键 6 平台全自动代发 / Live Demo
+              </Link>
+            </div>
+          </section>
         </article>
 
         {/* Right Sidebar: Brand Entity Fact Card & AI Readiness */}
