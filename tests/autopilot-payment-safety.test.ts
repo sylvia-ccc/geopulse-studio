@@ -191,9 +191,9 @@ describe("Payment fulfillment atomicity", () => {
   });
 });
 
-it("reports the 5.1.0 health version", async () => {
+it("reports the 5.1.1 health version", async () => {
   const route = await import("@/app/api/health/route");
   const response = await route.GET();
   expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ version: "5.1.0", database: "connected" });
+  expect(await response.json()).toMatchObject({ version: "5.1.1", database: "connected" });
 });

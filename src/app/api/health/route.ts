@@ -9,7 +9,7 @@ export async function GET() {
     {
       status: dbOk ? "ok" : "degraded",
       service: "geopulse-studio",
-      version: "5.1.0",
+      version: "5.1.1",
       database: dbOk ? "connected" : "error",
       uptimeSec: Math.round(process.uptime()),
       timestamp: new Date().toISOString(),

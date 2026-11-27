@@ -178,6 +178,7 @@ describe("v5.1 telemetry and consent capture", () => {
     for (const headers of [
       new Headers({ rsc: "1" }), new Headers({ "x-geopulse-test": "1" }),
       new Headers({ "user-agent": "Mozilla/5.0 GeoPulse-Test/5.1 GPTBot/1.0" }),
+      new Headers({ "user-agent": "GeoPulse-AuditBot/2.0 (+https://geopulse.studio)" }),
     ]) {
       expect(telemetry.shouldExcludeTelemetry(headers)).toBe(true);
       telemetry.recordTelemetryEvent({ eventType: "article_view", path: "/p/validation", headers });

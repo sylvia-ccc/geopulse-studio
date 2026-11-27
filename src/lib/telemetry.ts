@@ -22,7 +22,7 @@ export function isTelemetryPrefetch(headers?: Pick<Headers, "get">): boolean {
 export function shouldExcludeTelemetry(headers?: Pick<Headers, "get">, userAgent = ""): boolean {
   return isTelemetryPrefetch(headers) || headers?.get("rsc") === "1" ||
     headers?.get("x-geopulse-test") === "1" ||
-    /geopulse-test/i.test(userAgent || headers?.get("user-agent") || "");
+    /geopulse-(?:test|auditbot)/i.test(userAgent || headers?.get("user-agent") || "");
 }
 
 const TELEMETRY_RETENTION_MS = 90 * 86400_000;
