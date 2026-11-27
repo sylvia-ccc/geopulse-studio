@@ -1,6 +1,6 @@
-# 🚀 GeoPulse Studio (v4.2 Global)
+# 🚀 GeoPulse Studio (v5.0 Agency White-Label & Autopilot)
 
-**The Open-Source, Full-Stack Commercial GEO (Generative Engine Optimization) & Global Official-API Auto-Syndication Platform.**
+**The Open-Source, Full-Stack Commercial GEO (Generative Engine Optimization), White-Label Agency Suite, Global Official-API Auto-Syndication & Audit-to-Outreach Platform.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-geo.workagentpro.com-4f46e5?style=for-the-badge)](https://geo.workagentpro.com)
 [![Free AI Audit](https://img.shields.io/badge/Free%203s%20Audit-%2Faudit-10b981?style=for-the-badge)](https://geo.workagentpro.com/audit)
@@ -77,11 +77,17 @@ docker run -d --name geopulse-studio --restart unless-stopped \
   -p 3000:3000 --env-file .env -v $(pwd)/data:/app/data geopulse-studio
 ```
 
+- **v5.0 Agency & Growth Automation Additions**:
+  - **Turnkey White-Label Agency Suite**: Custom agency brand/logo/accent color, hide-powered-by toggle, and **HMAC-signed zero-login Shareable Client Reports (`/r/[id]?token=...`)** with Print-to-PDF.
+  - **GEO Autopilot Scheduler (`POST /api/cron/autopilot`)**: Queued bilingual topic engine that automatically generates 88+ GEO articles, publishes to `/p/[slug]` & `/llms.txt`, and syndicates globally on a safe cron cadence.
+  - **Self-Serve Payment Webhooks (`POST /api/webhooks/payment`)**: HMAC-verified LemonSqueezy, Stripe, and generic payment webhooks for instant plan upgrades, credit deposits, or automatic code minting.
+  - **Audit-to-Outreach Engine**: Batch-audit prospect websites (`/audit?url=...&auto=1`), auto-draft value-first personalized emails citing real AI visibility gaps, and dispatch compliantly via **Resend / Brevo Official APIs** with hard daily send caps and signed 1-click Unsubscribe blacklisting.
+
 ### Option 2: Local Development (Node 22+)
 
 ```bash
 npm install
-npm test       # 28 automated unit & integration tests (Vitest)
+npm test       # 32 automated unit & integration tests (Vitest)
 npm run dev    # http://localhost:3000 (1-click demo at /login?demo=1)
 ```
 

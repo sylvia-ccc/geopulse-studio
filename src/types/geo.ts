@@ -311,9 +311,63 @@ export interface CommercialSiteSettings {
   contactWechatOrEmail: string;
   checkoutProUrl: string;
   checkoutEnterpriseUrl: string;
+  checkoutCreditsUrl: string;
+  agencyLogoUrl: string;
+  agencyAccentColor: string;
+  hidePoweredBy: boolean;
   acquisitionNote: string;
   announcement: string;
   strictBilling: boolean;
+}
+
+export interface GrowthTopic {
+  id: string;
+  userId: string;
+  brandId: string;
+  titleHint: string;
+  keyword: string;
+  language: "en" | "zh";
+  archetype: ArticleArchetype;
+  targetAccountIds: string[];
+  status: "queued" | "published" | "failed";
+  articleId: string;
+  publishedUrls: string[];
+  errorMsg: string;
+  createdAt: string;
+  executedAt: string | null;
+}
+
+export type OutreachSegment = "agency_white_label" | "saas_growth" | "strategic_acquirer";
+
+export interface OutreachLead {
+  id: string;
+  userId: string;
+  companyName: string;
+  contactName: string;
+  email: string;
+  websiteUrl: string;
+  segment: OutreachSegment;
+  auditScore: number | null;
+  auditGrade: string;
+  auditMissing: string[];
+  emailSubject: string;
+  emailBody: string;
+  status: "new" | "audited" | "emailed" | "replied" | "converted" | "unsubscribed";
+  lastSentAt: string | null;
+  unsubscribed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OutreachEmailConfig {
+  provider: "none" | "resend" | "brevo" | "webhook";
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+  webhookUrl: string;
+  dailyLimit: number;
+  hasApiKey: boolean;
+  sentToday: number;
 }
 
 export interface PlanQuota {

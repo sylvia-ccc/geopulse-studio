@@ -22,6 +22,7 @@ import {
 import type {
   CommercialSiteSettings,
   DistributionOrder,
+  GrowthTopic,
   PlanTier,
   PlatformAccount,
   PlatformAccountType,
@@ -58,7 +59,7 @@ interface Props {
 }
 
 export function AdminView({ onRefreshGlobal, onNotify }: Props) {
-  const [subTab, setSubTab] = useState<"billing" | "accounts" | "orders">("billing");
+  const [subTab, setSubTab] = useState<"billing" | "accounts" | "orders" | "autopilot">("billing");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
@@ -66,6 +67,8 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
   const [siteCfg, setSiteCfg] = useState<CommercialSiteSettings | null>(null);
   const [platformAccounts, setPlatformAccounts] = useState<PlatformAccount[]>([]);
   const [orders, setOrders] = useState<DistributionOrder[]>([]);
+  const [growthTopics, setGrowthTopics] = useState<GrowthTopic[]>([]);
+  const [autopilotBusy, setAutopilotBusy] = useState(false);
 
   // Code generator state
   const [codeType, setCodeType] = useState<"plan" | "credits">("plan");
@@ -100,11 +103,12 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [ovRes, cfgRes, accRes, ordRes] = await Promise.all([
+      const [ovRes, cfgRes, accRes, ordRes, apRes] = await Promise.all([
         fetch("/api/admin/overview"),
         fetch("/api/site-config"),
         fetch("/api/admin/platform-accounts"),
         fetch("/api/admin/orders"),
+        fetch("/api/cron/autopilot"),
       ]);
       const ov = await ovRes.json();
       if (!ovRes.ok) throw new Error(ov.error || "加载运营数据失败");
@@ -122,6 +126,10 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
       if (ordRes.ok) {
         const ordJson = await ordRes.json();
         setOrders(ordJson.orders || []);
+      }
+      if (apRes.ok) {
+        const apJson = await apRes.json();
+        setGrowthTopics(apJson.topics || []);
       }
     } catch (err) {
       onNotify(err instanceof Error ? err.message : "加载失败", "error");
@@ -185,6 +193,10 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
           announcement: siteCfg.announcement,
           checkoutProUrl: siteCfg.checkoutProUrl,
           checkoutEnterpriseUrl: siteCfg.checkoutEnterpriseUrl,
+          checkoutCreditsUrl: siteCfg.checkoutCreditsUrl,
+          agencyLogoUrl: siteCfg.agencyLogoUrl,
+          agencyAccentColor: siteCfg.agencyAccentColor,
+          hidePoweredBy: siteCfg.hidePoweredBy,
           contactWechatOrEmail: siteCfg.contactWechatOrEmail,
           acquisitionNote: siteCfg.acquisitionNote,
         }),
@@ -383,6 +395,18 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
                 {pendingOrdersCount}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab("autopilot")}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 ${
+              subTab === "autopilot"
+                ? "bg-indigo-600 text-white"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Rocket className="h-3.5 w-3.5" />
+            自动增长与白标（{growthTopics.filter((t) => t.status === "queued").length}）
           </button>
         </div>
       </div>
@@ -1096,6 +1120,214 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB-TAB 4: GEO AUTOPILOT, PAYMENT WEBHOOK & WHITE-LABEL AGENCY SUITE */}
+      {subTab === "autopilot" && (
+        <div className="space-y-6">
+          {/* GEO Autopilot Queue */}
+          <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-xs">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  🚀 GEO 推 GEO 全自动定时增长队列（GEO Autopilot）
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  由服务器 Cron（每周二/五 UTC 10:00）自动从队列取下一篇选题 → 生成 88+ 分文章 → 写入 /llms.txt 并一键联发至全球官方 API。
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={autopilotBusy}
+                  onClick={async () => {
+                    setAutopilotBusy(true);
+                    try {
+                      const res = await fetch("/api/cron/autopilot", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "seed_official" }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || "初始化失败");
+                      await loadData();
+                      onNotify(`已向 Autopilot 队列装入 ${data.addedCount} 篇官方高意向选题`);
+                    } catch (err) {
+                      onNotify(err instanceof Error ? err.message : "失败", "error");
+                    } finally {
+                      setAutopilotBusy(false);
+                    }
+                  }}
+                  className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
+                >
+                  装入 6 篇高意向官方选题
+                </button>
+                <button
+                  type="button"
+                  disabled={autopilotBusy}
+                  onClick={async () => {
+                    setAutopilotBusy(true);
+                    try {
+                      const res = await fetch("/api/cron/autopilot", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "run_next", skipExternalBlast: false }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || "执行失败");
+                      await loadData();
+                      if (onRefreshGlobal) await onRefreshGlobal();
+                      onNotify(data.message || "执行完成");
+                    } catch (err) {
+                      onNotify(err instanceof Error ? err.message : "失败", "error");
+                    } finally {
+                      setAutopilotBusy(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {autopilotBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+                  立即执行下一篇（生文 + 全球联发）
+                </button>
+              </div>
+            </div>
+
+            {growthTopics.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+                队列为空，点击右上角「装入 6 篇高意向官方选题」即可启动无人值守 GEO 增长飞轮。
+              </div>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {growthTopics.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex flex-col justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 sm:flex-row sm:items-center"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            t.status === "published"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : t.status === "failed"
+                                ? "bg-rose-50 text-rose-700"
+                                : "bg-amber-50 text-amber-800"
+                          }`}
+                        >
+                          {t.status === "published" ? "已自动发布" : t.status === "failed" ? "失败" : "待定时执行"}
+                        </span>
+                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-700">
+                          {t.language}
+                        </span>
+                        <span className="font-bold text-slate-900">{t.titleHint}</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500">
+                        关键词：{t.keyword}
+                        {t.publishedUrls.length > 0 && ` · 已同步 ${t.publishedUrls.length} 个外链`}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await fetch(`/api/cron/autopilot?id=${encodeURIComponent(t.id)}`, { method: "DELETE" });
+                        await loadData();
+                      }}
+                      className="self-end rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:self-center"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Payment Webhook & White-Label Settings */}
+          {siteCfg && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+                <h2 className="text-sm font-bold text-slate-900">
+                  💳 海外支付 Webhook 全自动发货（LemonSqueezy / Stripe）
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  在 LemonSqueezy 或 Stripe 配置下方 Webhook 地址与 `PAYMENT_WEBHOOK_SECRET`，客户付款 \$29 / \$39 / \$149 后自动升级套餐或充值积分（未注册邮箱自动生成激活码）。
+                </p>
+                <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2.5 font-mono text-xs text-emerald-300">
+                  <span className="truncate flex-1">
+                    {typeof window !== "undefined" ? `${window.location.origin}/api/webhooks/payment` : "https://geo.workagentpro.com/api/webhooks/payment"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const u = `${window.location.origin}/api/webhooks/payment`;
+                      void navigator.clipboard.writeText(u);
+                      onNotify("已复制支付 Webhook 接收地址");
+                    }}
+                    className="rounded-lg bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25"
+                  >
+                    复制
+                  </button>
+                </div>
+                <div className="mt-3 rounded-xl bg-slate-50 p-3 text-[11px] text-slate-600">
+                  支持商品 SKU 关键字自动识别：含 `enterprise`/`agency` → 旗舰版（+300 积分）；含 `credit`/`100`/`300`/`1000` → 自动充值对应积分；其余 → Pro 月卡（+50 积分）。
+                </div>
+              </div>
+
+              <form
+                onSubmit={handleSaveSiteConfig}
+                className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    🏷️ 白标机构品牌定制（White-Label Suite）
+                  </h2>
+                  <button
+                    type="submit"
+                    disabled={savingSite}
+                    className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    保存白标设置
+                  </button>
+                </div>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <input
+                    value={siteCfg.brandTitle}
+                    onChange={(e) => setSiteCfg({ ...siteCfg, brandTitle: e.target.value })}
+                    placeholder="机构白标品牌名"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                  />
+                  <input
+                    value={siteCfg.agencyAccentColor || "#4f46e5"}
+                    onChange={(e) => setSiteCfg({ ...siteCfg, agencyAccentColor: e.target.value })}
+                    placeholder="主题色 Hex，如 #4f46e5"
+                    className="rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+                  />
+                  <input
+                    value={siteCfg.agencyLogoUrl || ""}
+                    onChange={(e) => setSiteCfg({ ...siteCfg, agencyLogoUrl: e.target.value })}
+                    placeholder="机构 Logo 图片 URL（选填）"
+                    className="rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs sm:col-span-2"
+                  />
+                  <input
+                    value={siteCfg.checkoutCreditsUrl || ""}
+                    onChange={(e) => setSiteCfg({ ...siteCfg, checkoutCreditsUrl: e.target.value })}
+                    placeholder="积分充值包收款链接（LemonSqueezy / Gumroad）"
+                    className="rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs sm:col-span-2"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(siteCfg.hidePoweredBy)}
+                    onChange={(e) => setSiteCfg({ ...siteCfg, hidePoweredBy: e.target.checked })}
+                  />
+                  在免登录客户报告 `/r/[id]` 与工作台隐藏 “Powered by GeoPulse Studio” 角标（纯白标交付）
+                </label>
+              </form>
             </div>
           )}
         </div>

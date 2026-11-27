@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Loader2,
   LogOut,
+  Mail,
   Radar,
   Rocket,
   Send,
@@ -36,6 +37,7 @@ import { BrandsView } from "./views/BrandsView";
 import { StudioView } from "./views/StudioView";
 import { PublishView } from "./views/PublishView";
 import { MarketplaceView } from "./views/MarketplaceView";
+import { OutreachView } from "./views/OutreachView";
 import { MonitorView } from "./views/MonitorView";
 import { SiteAuditView } from "./views/SiteAuditView";
 import { AdminView } from "./views/AdminView";
@@ -78,6 +80,7 @@ type TabId =
   | "studio"
   | "publish"
   | "marketplace"
+  | "outreach"
   | "monitor"
   | "audit"
   | "settings"
@@ -89,6 +92,7 @@ const BASE_NAV_ITEMS: Array<{ id: TabId; label: string; icon: typeof LayoutDashb
   { id: "studio", label: "GEO 创作工坊", icon: Sparkles },
   { id: "publish", label: "多渠道发布中心", icon: Send },
   { id: "marketplace", label: "托管代发市场", icon: Rocket },
+  { id: "outreach", label: "体检获客触达", icon: Mail },
   { id: "monitor", label: "AI 收录与 SOV", icon: Radar },
   { id: "audit", label: "官网 AI 体检", icon: Globe2 },
   { id: "settings", label: "设置与配额", icon: Settings },
@@ -206,10 +210,10 @@ export function AppShell() {
             </div>
             <div>
               <div className="text-sm font-extrabold tracking-tight text-slate-900">
-                GeoPulse Studio
+                {siteConfig?.brandTitle || "GeoPulse Studio"}
               </div>
               <div className="text-[10px] font-semibold text-indigo-600">
-                商用 GEO 2.0 平台
+                {siteConfig?.hidePoweredBy ? "White-Label GEO Suite" : "GEO 5.0 Global 商用版"}
               </div>
             </div>
           </Link>
@@ -408,6 +412,8 @@ export function AppShell() {
               onNotify={notify}
             />
           )}
+
+          {tab === "outreach" && <OutreachView onNotify={notify} />}
 
           {tab === "monitor" && (
             <MonitorView

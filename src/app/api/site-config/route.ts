@@ -14,6 +14,10 @@ const configSchema = z.object({
   contactWechatOrEmail: z.string().max(240).optional(),
   checkoutProUrl: z.string().max(300).optional(),
   checkoutEnterpriseUrl: z.string().max(300).optional(),
+  checkoutCreditsUrl: z.string().max(300).optional(),
+  agencyLogoUrl: z.string().max(300).optional(),
+  agencyAccentColor: z.string().max(30).optional(),
+  hidePoweredBy: z.boolean().optional(),
   acquisitionNote: z.string().max(300).optional(),
   announcement: z.string().max(300).optional(),
 });

@@ -245,6 +245,54 @@ function openDatabase(): SqliteDatabase {
       created_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS growth_topics (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      title_hint TEXT NOT NULL,
+      keyword TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'en',
+      archetype TEXT NOT NULL DEFAULT 'comparison_matrix',
+      target_account_ids_json TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'queued',
+      article_id TEXT NOT NULL DEFAULT '',
+      published_urls_json TEXT NOT NULL DEFAULT '[]',
+      error_msg TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      executed_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS outreach_leads (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      company_name TEXT NOT NULL,
+      contact_name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL,
+      website_url TEXT NOT NULL DEFAULT '',
+      segment TEXT NOT NULL DEFAULT 'agency_white_label',
+      audit_score INTEGER,
+      audit_grade TEXT NOT NULL DEFAULT '',
+      audit_missing_json TEXT NOT NULL DEFAULT '[]',
+      email_subject TEXT NOT NULL DEFAULT '',
+      email_body TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'new',
+      last_sent_at TEXT,
+      unsubscribed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_webhook_events (
+      event_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      buyer_email TEXT NOT NULL,
+      product_sku TEXT NOT NULL,
+      action_taken TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Safe forward migrations for existing production SQLite databases
@@ -1323,12 +1371,16 @@ export function dbHealthCheck(): boolean {
 
 const DEFAULT_SITE_SETTINGS: Omit<CommercialSiteSettings, "strictBilling"> = {
   brandTitle: "GeoPulse Studio",
-  contactWechatOrEmail: "商务/购买激活码与源码合作：请在 GitHub 提 Issue 或联系管理员",
+  contactWechatOrEmail: "商务/白标机构合作与收购洽谈：sylviacccyu@gmail.com 或 GitHub Issue",
   checkoutProUrl: "",
   checkoutEnterpriseUrl: "",
-  acquisitionNote: "开放 MIT 社区版自托管，同时支持企业私有化定制与整站商业合作/收购洽谈。",
+  checkoutCreditsUrl: "",
+  agencyLogoUrl: "",
+  agencyAccentColor: "#4f46e5",
+  hidePoweredBy: false,
+  acquisitionNote: "开放 MIT 社区版自托管，同时支持白标代运营机构私有化定制与整站商业合作/收购洽谈。",
   announcement:
-    "GeoPulse Studio 4.2 Global 上线：支持 DEV.to / Bluesky / GitHub Pages / Qiita / Telegraph 一键 6 平台官方 API 联发包（立省 20%）与免登录官网 GEO 体检！",
+    "GeoPulse Studio 5.0 Global 上线：新增白标机构免登录客户报告、GEO 自动增长飞轮、海外支付 Webhook 与 AI 体检精准邮件触达！",
 };
 
 export function getCommercialSiteSettings(): CommercialSiteSettings {
@@ -1345,6 +1397,10 @@ export function getCommercialSiteSettings(): CommercialSiteSettings {
     checkoutProUrl: map.get("checkoutProUrl") ?? DEFAULT_SITE_SETTINGS.checkoutProUrl,
     checkoutEnterpriseUrl:
       map.get("checkoutEnterpriseUrl") ?? DEFAULT_SITE_SETTINGS.checkoutEnterpriseUrl,
+    checkoutCreditsUrl: map.get("checkoutCreditsUrl") ?? DEFAULT_SITE_SETTINGS.checkoutCreditsUrl,
+    agencyLogoUrl: map.get("agencyLogoUrl") ?? DEFAULT_SITE_SETTINGS.agencyLogoUrl,
+    agencyAccentColor: map.get("agencyAccentColor") || DEFAULT_SITE_SETTINGS.agencyAccentColor,
+    hidePoweredBy: map.get("hidePoweredBy") === "true",
     acquisitionNote: map.get("acquisitionNote") || DEFAULT_SITE_SETTINGS.acquisitionNote,
     announcement: map.get("announcement") ?? DEFAULT_SITE_SETTINGS.announcement,
     strictBilling: process.env.COMMERCIAL_STRICT_BILLING === "true",
@@ -1363,6 +1419,10 @@ export function updateCommercialSiteSettings(
     "contactWechatOrEmail",
     "checkoutProUrl",
     "checkoutEnterpriseUrl",
+    "checkoutCreditsUrl",
+    "agencyLogoUrl",
+    "agencyAccentColor",
+    "hidePoweredBy",
     "acquisitionNote",
     "announcement",
   ];

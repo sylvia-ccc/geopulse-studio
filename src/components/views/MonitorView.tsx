@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Radar,
+  Share2,
   Sparkles,
   Trash2,
   XCircle,
@@ -195,18 +196,43 @@ export function MonitorView({
             对标 Profound / Peec AI：追踪各引擎品牌提及率、竞品声量占比、AI 引用来源域名分布与全漏斗提问词库。
           </p>
         </div>
-        <select
-          value={filterBrandId}
-          onChange={(e) => setFilterBrandId(e.target.value)}
-          className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs"
-        >
-          <option value="all">全部品牌汇总</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              仅看：{b.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const targetId =
+                filterBrandId !== "all" ? filterBrandId : brandId || brands[0]?.id;
+              if (!targetId) {
+                onNotify("请先创建至少一个品牌档案", "error");
+                return;
+              }
+              const res = await fetch(`/api/reports/brand/${encodeURIComponent(targetId)}/share`);
+              const data = await res.json();
+              if (!res.ok || !data.shareUrl) {
+                onNotify(data.error || "生成分享链接失败", "error");
+                return;
+              }
+              await navigator.clipboard.writeText(data.shareUrl);
+              onNotify("已复制免登录白标客户报告链接！可直接发给客户浏览或打印 PDF");
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-2xs hover:bg-indigo-700"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            复制客户白标报告链接
+          </button>
+          <select
+            value={filterBrandId}
+            onChange={(e) => setFilterBrandId(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs"
+          >
+            <option value="all">全部品牌汇总</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                仅看：{b.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Engine Visibility Stats */}

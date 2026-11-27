@@ -98,7 +98,7 @@ export default function LandingPage() {
                 {siteConfig.brandTitle}
               </span>
               <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                GEO 4.2 Global
+                GEO 5.0 Global
               </span>
             </div>
           </Link>

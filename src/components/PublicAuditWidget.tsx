@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -58,6 +58,41 @@ export function PublicAuditWidget() {
   const [error, setError] = useState("");
   const [siteReport, setSiteReport] = useState<SitePublicReport | null>(null);
   const [contentAudit, setContentAudit] = useState<ContentPublicAudit | null>(null);
+  const autoRanRef = useRef(false);
+
+  const runSiteAuditDirect = useCallback(async (targetUrl: string) => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/public/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "site", url: targetUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "诊断失败");
+      setSiteReport(data.report);
+      setContentAudit(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "请求失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (autoRanRef.current || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const qUrl = params.get("url")?.trim();
+    if (qUrl) {
+      autoRanRef.current = true;
+      setMode("site");
+      setUrl(qUrl);
+      if (params.get("auto") === "1") {
+        void runSiteAuditDirect(qUrl);
+      }
+    }
+  }, [runSiteAuditDirect]);
 
   const handleRun = async (e: React.FormEvent) => {
     e.preventDefault();
