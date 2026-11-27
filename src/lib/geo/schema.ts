@@ -66,16 +66,9 @@ export function buildGeoJsonLd(params: {
       },
     };
 
-    const priceMatch = params.brand.pricingInfo.match(/(\d+(?:\.\d+)?)/);
-    if (priceMatch) {
-      productNode.offers = {
-        "@type": "Offer",
-        priceCurrency: params.brand.pricingInfo.includes("$") ? "USD" : "CNY",
-        price: priceMatch[1],
-        description: params.brand.pricingInfo,
-        availability: "https://schema.org/InStock",
-      };
-    }
+    // pricingInfo is free-form copy. It can contain years, multiple tiers, or
+    // currencies; inferring a machine-readable Offer from its first number is unsafe.
+    // Publish an Offer only after an explicit structured-price model is introduced.
 
     graph.push(productNode);
   }
@@ -146,7 +139,7 @@ export function buildLlmsTxt(params: {
   const lines: string[] = [
     "# GeoPulse Studio — Published Brand Knowledge & GEO Index",
     "",
-    "> Structured, fact-checked brand knowledge base and citation-ready articles optimized for Generative Search Engines (ChatGPT Search, Perplexity, DeepSeek, Kimi, Doubao, Google AI Overviews).",
+    "> Published website resources and article metadata. Content scores describe internal technical checks; they do not establish factual accuracy, indexing, rankings, or AI citations.",
     "",
     `> Full corpus available at: ${base}/llms-full.txt`,
     "",
@@ -176,7 +169,7 @@ export function buildLlmsTxt(params: {
   }
 
   lines.push("", "## Crawling & Citation Policy", "");
-  lines.push("- AI Crawlers (GPTBot, OAI-SearchBot, PerplexityBot, ClaudeBot, Google-Extended, Bytespider, DeepSeekBot) are explicitly permitted to index and cite all published pages under `/p/`.");
+  lines.push("- Published pages under `/p/` are intended for public reading. Consult the current robots.txt for crawl preferences. Access permission does not demonstrate retrieval, indexing, or citation by a provider.");
   lines.push(`- Sitemap: ${base}/sitemap.xml`);
   lines.push("");
 

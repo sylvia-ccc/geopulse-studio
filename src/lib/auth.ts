@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { cookies } from "next/headers";
 import type { PlanQuota, PlanTier, UserAccount } from "@/types/geo";
 
 export const SESSION_COOKIE_NAME = "geopulse_session";
@@ -117,6 +116,7 @@ export function verifySessionToken(token: string): string | null {
 }
 
 export async function getSessionUserId(): Promise<string | null> {
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;

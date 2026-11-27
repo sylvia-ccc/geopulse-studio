@@ -29,7 +29,7 @@ const generateSchema = z.object({
     .array(z.enum(["doubao", "deepseek", "chatgpt", "perplexity", "gemini"]))
     .min(1)
     .default(["doubao", "deepseek", "chatgpt"]),
-  customWeights: z.record(z.number()).optional(),
+  customWeights: z.record(z.string(), z.number()).optional(),
   targetChannel: z
     .enum(["geo_hub", "zhihu", "wechat", "xiaohongshu", "csdn", "wordpress", "webhook"])
     .default("geo_hub"),

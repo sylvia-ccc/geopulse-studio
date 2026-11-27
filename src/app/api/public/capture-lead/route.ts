@@ -7,7 +7,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const captureSchema = z.object({
   email: z.string().trim().max(254).email("请输入有效的接收邮箱"),
-  consent: z.literal(true, { errorMap: () => ({ message: "请先同意保存邮箱和本次体检结果，以便联系你提供修复建议" }) }),
+  consent: z.literal(true, { error: "请先同意保存邮箱和本次体检结果，以便联系你提供修复建议" }),
   auditToken: z.string().min(1, "请先完成体检").max(8192),
 });
 
