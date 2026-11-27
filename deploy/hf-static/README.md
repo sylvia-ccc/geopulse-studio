@@ -7,7 +7,7 @@ sdk: static
 app_file: index.html
 pinned: false
 license: mit
-short_description: GEO website audit and editorial publishing workspace showcase
+short_description: Website audits, editorial review, and API publishing
 ---
 
 # GeoPulse Studio 5.1

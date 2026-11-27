@@ -30,6 +30,10 @@ for name in allowed:
 readme = (folder / "README.md").read_text(encoding="utf-8")
 if not readme.startswith("---\n") or "\nsdk: static\n" not in readme or "\napp_file: index.html\n" not in readme:
     sys.exit("README.md must declare sdk: static and app_file: index.html.")
+front_matter = readme.split("---", 2)[1]
+short_description = re.search(r"^short_description:\s*(.*?)\s*$", front_matter, re.M)
+if short_description and len(short_description.group(1).strip("\"'")) > 60:
+    sys.exit("README.md short_description must be at most 60 characters.")
 if sys.argv[1:] == ["--check"]:
     print("Static showcase validated: README.md, index.html. No network request made.")
     sys.exit(0)
@@ -50,11 +54,14 @@ if not token:
 
 api = HfApi(token=token)
 repo_id = f"{username}/{space_name}"
+stage = "whoami"
 try:
     identity = api.whoami()
     if identity.get("name") != username:
         sys.exit("The local token belongs to a different Hugging Face account. Select the intended account before publishing.")
+    stage = "create_repo"
     api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="static", private=False, exist_ok=True)
+    stage = "upload_folder"
     api.upload_folder(
         repo_id=repo_id,
         repo_type="space",
@@ -64,8 +71,15 @@ try:
         commit_message="Publish GeoPulse Studio 5.1 static showcase",
     )
 except Exception as exc:
-    # Do not echo exception bodies, request headers, or credential values.
-    sys.exit(f"Hugging Face upload failed ({type(exc).__name__}). Check account access and connectivity using the official HF tools.")
+    # Validation messages help diagnose SDK/API changes. Never echo HTTP bodies,
+    # request headers, or credentials; only local ValueError text is included.
+    detail = ""
+    if isinstance(exc, ValueError):
+        safe_text = str(exc).replace(token, "[REDACTED]")
+        safe_text = re.sub(r"hf_[A-Za-z0-9]+", "[REDACTED]", safe_text)
+        safe_lines = [line for line in safe_text.splitlines() if not re.search(r"authorization|bearer|headers", line, re.I)]
+        detail = " " + " ".join(safe_lines)[:1500]
+    sys.exit(f"Hugging Face {stage} failed ({type(exc).__name__}).{detail}")
 print(f"Static showcase uploaded: https://huggingface.co/spaces/{repo_id}")
 print("Uploaded README.md and index.html only; repository history was not rewritten.")
 PY
