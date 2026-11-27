@@ -2,12 +2,12 @@
 title: GeoPulse Studio
 emoji: 🚀
 colorFrom: indigo
-colorTo: emerald
+colorTo: green
 sdk: docker
 app_port: 3000
 pinned: false
 license: mit
-short_description: Open-source commercial GEO (AI Search Optimization) publishing studio
+short_description: Open-Source GEO (AI Search Optimization) Studio
 ---
 
 # 🚀 GeoPulse Studio 2.0 — 智引 GEO 商用生成式引擎优化与发布系统
@@ -23,7 +23,7 @@ short_description: Open-source commercial GEO (AI Search Optimization) publishin
 ### 🔗 Live Demos & Links
 - **GitHub Repository**: https://github.com/sylvia-ccc/geopulse-studio
 - **Hugging Face Space**: https://huggingface.co/spaces/sylviacccyu/geopulse-studio
-- **US Live Demo Server**: `http://43.162.105.20:3100` *(Demo Admin: `demo@geopulse.ai` / `Demo123456!` · 1-Click Login Available)*
+- **US Live Demo Server**: https://geo.workagentpro.com *(Demo Admin: `demo@geopulse.ai` / `Demo123456!` · 1-Click Login Available)*
 
 ---
 
