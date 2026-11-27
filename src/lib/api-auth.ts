@@ -26,7 +26,7 @@ export function unauthorizedResponse() {
 }
 
 export function getBaseUrl(req: NextRequest): string {
-  const envBase = process.env.NEXT_PUBLIC_APP_URL;
+  const envBase = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
   if (envBase) return envBase.replace(/\/$/, "");
   const proto = req.headers.get("x-forwarded-proto") || "http";
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3000";
