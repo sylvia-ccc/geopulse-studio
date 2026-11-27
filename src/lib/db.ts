@@ -6,6 +6,7 @@ import type {
   ArticleArchetype,
   BrandProfile,
   CitationCheck,
+  CommercialSiteSettings,
   ComparisonTable,
   FAQItem,
   FunnelStage,
@@ -191,6 +192,11 @@ function openDatabase(): SqliteDatabase {
       redeemed_at TEXT,
       note TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
   `);
 
@@ -1078,6 +1084,60 @@ export function dbHealthCheck(): boolean {
   } catch {
     return false;
   }
+}
+
+// ---------------- Commercial Site Settings Repository ----------------
+
+const DEFAULT_SITE_SETTINGS: Omit<CommercialSiteSettings, "strictBilling"> = {
+  brandTitle: "GeoPulse Studio",
+  contactWechatOrEmail: "商务/购买激活码与源码合作：请在 GitHub 提 Issue 或联系管理员",
+  checkoutProUrl: "",
+  checkoutEnterpriseUrl: "",
+  acquisitionNote: "开放 MIT 社区版自托管，同时支持企业私有化定制与整站商业合作/收购洽谈。",
+  announcement: "GeoPulse Studio 3.0 正式上线：新增免登录 GEO 秒测、10 大模型一键接入与零 API Key 专家提示词模式！",
+};
+
+export function getCommercialSiteSettings(): CommercialSiteSettings {
+  const rows = getDb().prepare("SELECT key, value FROM site_settings").all();
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    map.set(String(r.key), String(r.value));
+  }
+
+  return {
+    brandTitle: map.get("brandTitle") || DEFAULT_SITE_SETTINGS.brandTitle,
+    contactWechatOrEmail:
+      map.get("contactWechatOrEmail") || DEFAULT_SITE_SETTINGS.contactWechatOrEmail,
+    checkoutProUrl: map.get("checkoutProUrl") ?? DEFAULT_SITE_SETTINGS.checkoutProUrl,
+    checkoutEnterpriseUrl:
+      map.get("checkoutEnterpriseUrl") ?? DEFAULT_SITE_SETTINGS.checkoutEnterpriseUrl,
+    acquisitionNote: map.get("acquisitionNote") || DEFAULT_SITE_SETTINGS.acquisitionNote,
+    announcement: map.get("announcement") ?? DEFAULT_SITE_SETTINGS.announcement,
+    strictBilling: process.env.COMMERCIAL_STRICT_BILLING === "true",
+  };
+}
+
+export function updateCommercialSiteSettings(
+  updates: Partial<Omit<CommercialSiteSettings, "strictBilling">>
+): CommercialSiteSettings {
+  const stmt = getDb().prepare(
+    `INSERT INTO site_settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  );
+  const allowedKeys: Array<keyof Omit<CommercialSiteSettings, "strictBilling">> = [
+    "brandTitle",
+    "contactWechatOrEmail",
+    "checkoutProUrl",
+    "checkoutEnterpriseUrl",
+    "acquisitionNote",
+    "announcement",
+  ];
+  for (const k of allowedKeys) {
+    if (updates[k] !== undefined) {
+      stmt.run(k, String(updates[k]).trim());
+    }
+  }
+  return getCommercialSiteSettings();
 }
 
 // ---------------- Initial Commercial Demo Seed ----------------

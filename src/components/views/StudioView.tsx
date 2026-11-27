@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   Code2,
+  Copy,
   ExternalLink,
   Eye,
   FileText,
@@ -22,6 +24,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { markdownToCleanHtml } from "@/lib/geo/generator";
+import { buildExternalPromptPack } from "@/lib/geo/prompt-pack";
 import type {
   AIEngineId,
   ArticleArchetype,
@@ -53,6 +56,7 @@ interface Props {
   hasLlmKey: boolean;
   onRefresh: () => Promise<void>;
   onGoPublish: (articleId: string) => void;
+  onOpenSettings?: () => void;
   onNotify: (msg: string, type?: "success" | "error") => void;
 }
 
@@ -64,6 +68,7 @@ export function StudioView({
   hasLlmKey,
   onRefresh,
   onGoPublish,
+  onOpenSettings,
   onNotify,
 }: Props) {
   const [subMode, setSubMode] = useState<"architect" | "editor" | "import">(
@@ -74,6 +79,8 @@ export function StudioView({
   const [importKeyword, setImportKeyword] = useState("");
   const [importContent, setImportContent] = useState("");
   const [importing, setImporting] = useState(false);
+  const [showPromptPack, setShowPromptPack] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   // Architect state
   const [selectedBrandId, setSelectedBrandId] = useState<string>(
@@ -96,6 +103,27 @@ export function StudioView({
   const [blueprints, setBlueprints] = useState<TopicBlueprint[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [generating, setGenerating] = useState(false);
+
+  const selectedBrandObj = brands.find((b) => b.id === selectedBrandId) || null;
+  const externalPromptPackText = selectedBrandObj
+    ? buildExternalPromptPack({
+        brand: selectedBrandObj,
+        archetype,
+        targetEngines,
+        weights,
+        targetChannel,
+        targetKeyword,
+        customAngle,
+      })
+    : "";
+
+  const handleCopyPromptPack = async () => {
+    if (!externalPromptPackText) return;
+    await navigator.clipboard.writeText(externalPromptPackText);
+    setCopiedPrompt(true);
+    onNotify("专家 GEO 提示词包已复制！可粘贴给 DeepSeek / 豆包 / ChatGPT 生成后再点「3. 已有文章改造」回填");
+    setTimeout(() => setCopiedPrompt(false), 2500);
+  };
 
   // Editor & Auditor state
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
@@ -475,13 +503,24 @@ export function StudioView({
           <div className="space-y-6 lg:col-span-7">
             {/* Step 1: Select Brand */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-bold text-slate-900">
                   第一步：选择目标品牌 / 产品
                 </h2>
-                <span className="text-xs text-slate-400">
-                  引擎模式：{hasLlmKey ? "实时 LLM 模型已就绪" : "内置零配置 GEO 结构化引擎"}
-                </span>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={hasLlmKey ? "font-semibold text-emerald-700" : "text-slate-500"}>
+                    {hasLlmKey ? "实时 LLM 模型已就绪" : "内置零配置引擎"}
+                  </span>
+                  {!hasLlmKey && onOpenSettings && (
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className="rounded-md bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 hover:bg-indigo-100"
+                    >
+                      30秒接入免费模型Key →
+                    </button>
+                  )}
+                </div>
               </div>
               {brands.length === 0 ? (
                 <p className="mt-3 text-xs text-amber-700">
@@ -795,6 +834,52 @@ export function StudioView({
                   </>
                 )}
               </button>
+
+              {/* Zero-API-Key Expert Prompt Pack Mode */}
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPromptPack(!showPromptPack)}
+                  disabled={!selectedBrandObj}
+                  className="flex w-full items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/60 px-3.5 py-2.5 text-left text-xs font-bold text-emerald-900 transition hover:bg-emerald-100/70 disabled:opacity-50"
+                >
+                  <span>💡 无 API Key？导出专家级 GEO 提示词包（用自己的豆包/DeepSeek）</span>
+                  <span className="text-[11px] text-emerald-700">
+                    {showPromptPack ? "收起" : "展开"}
+                  </span>
+                </button>
+
+                {showPromptPack && selectedBrandObj && (
+                  <div className="mt-3 space-y-2.5 rounded-xl border border-emerald-200 bg-white p-3.5 text-xs">
+                    <p className="text-[11px] leading-relaxed text-slate-600">
+                      1. 点击下方复制按当前 8 维权重编排好的提示词 → 2. 粘贴到 DeepSeek/豆包/ChatGPT/Kimi 网页版生成 → 3. 点「回填解析」自动提取胶囊、FAQ、算分并发布！
+                    </p>
+                    <textarea
+                      readOnly
+                      rows={6}
+                      value={externalPromptPackText}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-[11px] text-slate-700"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyPromptPack()}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                      >
+                        {copiedPrompt ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copiedPrompt ? "已复制提示词包" : "一键复制提示词包"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubMode("import")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        去粘贴 AI 生成结果 →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -842,18 +927,21 @@ export function StudioView({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-700">原文章标题 *</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              文章标题（选填：留空则自动从粘贴内容中的 # 标题提取）
+            </label>
             <input
-              required
               value={importTitle}
               onChange={(e) => setImportTitle(e.target.value)}
-              placeholder="粘贴您现有的文章标题"
+              placeholder="粘贴已有标题，或留空由系统自动提取"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-700">原文章正文（纯文本或 Markdown）*</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              文章正文 / 外部 AI 生成结果（支持自动解析直答胶囊与 FAQ 并生成 JSON-LD）*
+            </label>
             <textarea
               required
               rows={12}

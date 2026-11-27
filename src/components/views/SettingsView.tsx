@@ -13,7 +13,8 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import type { PlanQuota, PlanTier } from "@/types/geo";
+import type { CommercialSiteSettings, PlanQuota, PlanTier } from "@/types/geo";
+import { LLM_PROVIDER_PRESETS, type LlmProviderPreset } from "@/lib/geo/llm-presets";
 
 interface SanitizedUser {
   id: string;
@@ -35,11 +36,12 @@ interface SanitizedUser {
 interface Props {
   user: SanitizedUser;
   plans: PlanQuota[];
+  siteConfig?: CommercialSiteSettings | null;
   onRefresh: () => Promise<void>;
   onNotify: (msg: string, type?: "success" | "error") => void;
 }
 
-export function SettingsView({ user, plans, onRefresh, onNotify }: Props) {
+export function SettingsView({ user, plans, siteConfig, onRefresh, onNotify }: Props) {
   const [name, setName] = useState(user.name);
   const [company, setCompany] = useState(user.company);
   const [llmProvider, setLlmProvider] = useState(user.llmProvider);
@@ -51,6 +53,15 @@ export function SettingsView({ user, plans, onRefresh, onNotify }: Props) {
   const [copiedKey, setCopiedKey] = useState(false);
   const [redeemCode, setRedeemCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<LlmProviderPreset | null>(null);
+
+  const applyLlmPreset = (preset: LlmProviderPreset) => {
+    setSelectedPreset(preset);
+    setLlmProvider(preset.providerKey);
+    setLlmBaseUrl(preset.baseUrl);
+    setLlmModel(preset.defaultModel);
+    onNotify(`已自动填入「${preset.name}」接口与推荐模型 ${preset.defaultModel}，粘贴 API Key 保存即可`);
+  };
 
   const handleRedeem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,7 +191,7 @@ export function SettingsView({ user, plans, onRefresh, onNotify }: Props) {
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
               <Cpu className="h-4 w-4 text-indigo-600" />
-              大模型引擎接入（BYOK）
+              大模型引擎接入（支持 9 大国内外平台一键预设）
             </h2>
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -195,6 +206,57 @@ export function SettingsView({ user, plans, onRefresh, onNotify }: Props) {
                   ? "服务端全局算力池已就绪"
                   : "当前使用内置零配置引擎"}
             </span>
+          </div>
+
+          {/* 9-Provider 1-Click Presets */}
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-slate-700">
+              快捷一键预设（点击自动填好接口地址与推荐模型，密钥采用 AES-256-GCM 加密存储）：
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {LLM_PROVIDER_PRESETS.map((preset) => {
+                const active = selectedPreset?.id === preset.id || (llmBaseUrl === preset.baseUrl && Boolean(llmBaseUrl));
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyLlmPreset(preset)}
+                    className={`rounded-xl border p-2.5 text-left transition ${
+                      active
+                        ? "border-indigo-600 bg-indigo-50/70 ring-1 ring-indigo-200"
+                        : "border-slate-200 bg-slate-50/60 hover:border-indigo-300 hover:bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="truncate text-xs font-bold text-slate-900">
+                        {preset.name}
+                      </span>
+                      <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 ring-1 ring-slate-200">
+                        {preset.badge}
+                      </span>
+                    </div>
+                    <div className="mt-1 truncate font-mono text-[10px] text-slate-500">
+                      {preset.defaultModel}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedPreset && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3.5 py-2 text-xs text-emerald-900">
+                <span>
+                  <strong>{selectedPreset.name}</strong>：{selectedPreset.costNote}
+                </span>
+                <a
+                  href={selectedPreset.keyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-bold text-indigo-700 underline"
+                >
+                  前往领取 API Key <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -437,18 +499,46 @@ export function SettingsView({ user, plans, onRefresh, onNotify }: Props) {
                     {p.maxWebhooks} 个 Webhook / CMS 自动推送渠道
                   </li>
                 </ul>
-                <button
-                  type="button"
-                  disabled={isCurrent}
-                  onClick={() => void handleSwitchPlan(p.tier)}
-                  className={`mt-5 w-full rounded-xl py-2 text-xs font-bold transition ${
-                    isCurrent
-                      ? "bg-slate-200 text-slate-500"
-                      : "bg-slate-900 text-white hover:bg-slate-800"
-                  }`}
-                >
-                  {isCurrent ? "正在使用" : "切换体验此档位"}
-                </button>
+                {isCurrent ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-5 w-full rounded-xl bg-slate-200 py-2 text-xs font-bold text-slate-500"
+                  >
+                    正在使用
+                  </button>
+                ) : siteConfig?.strictBilling && user.role !== "admin" ? (
+                  (() => {
+                    const url =
+                      p.tier === "pro"
+                        ? siteConfig.checkoutProUrl
+                        : p.tier === "enterprise"
+                          ? siteConfig.checkoutEnterpriseUrl
+                          : "";
+                    return url ? (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-5 block w-full rounded-xl bg-indigo-600 py-2 text-center text-xs font-bold text-white hover:bg-indigo-700"
+                      >
+                        购买 {p.tier.toUpperCase()} 激活码 →
+                      </a>
+                    ) : (
+                      <div className="mt-5 rounded-xl bg-slate-100 px-3 py-2 text-center text-[11px] font-medium text-slate-600">
+                        请在上方输入激活码升级 · {siteConfig.contactWechatOrEmail}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleSwitchPlan(p.tier)}
+                    className="mt-5 w-full rounded-xl bg-slate-900 py-2 text-xs font-bold text-white transition hover:bg-slate-800"
+                  >
+                    切换体验此档位
+                  </button>
+                )}
               </div>
             );
           })}

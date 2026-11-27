@@ -21,6 +21,7 @@ import {
 import type {
   BrandProfile,
   CitationCheck,
+  CommercialSiteSettings,
   GeoArticle,
   PlanQuota,
   PlanTier,
@@ -101,6 +102,7 @@ export function AppShell() {
   const [logs, setLogs] = useState<PublishLog[]>([]);
   const [checks, setChecks] = useState<CitationCheck[]>([]);
   const [plans, setPlans] = useState<PlanQuota[]>([]);
+  const [siteConfig, setSiteConfig] = useState<CommercialSiteSettings | null>(null);
 
   const [studioBrandId, setStudioBrandId] = useState<string | undefined>(undefined);
   const [studioArticleId, setStudioArticleId] = useState<string | undefined>(undefined);
@@ -124,7 +126,7 @@ export function AppShell() {
     const meData = (await meRes.json()) as MeResponse;
     setMe(meData);
 
-    const [brandsRes, articlesRes, channelsRes, logsRes, checksRes, settingsRes] =
+    const [brandsRes, articlesRes, channelsRes, logsRes, checksRes, settingsRes, siteCfgRes] =
       await Promise.all([
         fetch("/api/brands"),
         fetch("/api/articles"),
@@ -132,15 +134,17 @@ export function AppShell() {
         fetch("/api/publish-logs"),
         fetch("/api/citations"),
         fetch("/api/settings"),
+        fetch("/api/site-config"),
       ]);
 
-    const [bJson, aJson, chJson, lJson, cJson, sJson] = await Promise.all([
+    const [bJson, aJson, chJson, lJson, cJson, sJson, cfgJson] = await Promise.all([
       brandsRes.json(),
       articlesRes.json(),
       channelsRes.json(),
       logsRes.json(),
       checksRes.json(),
       settingsRes.json(),
+      siteCfgRes.json(),
     ]);
 
     setBrands(bJson.brands || []);
@@ -149,6 +153,7 @@ export function AppShell() {
     setLogs(lJson.logs || []);
     setChecks(cJson.checks || []);
     setPlans(sJson.plans || []);
+    setSiteConfig(cfgJson.config || null);
     setLoading(false);
   }, [router]);
 
@@ -352,6 +357,7 @@ export function AppShell() {
                 setPublishArticleId(artId);
                 setTab("publish");
               }}
+              onOpenSettings={() => setTab("settings")}
               onNotify={notify}
             />
           )}
@@ -393,6 +399,7 @@ export function AppShell() {
             <SettingsView
               user={me.user}
               plans={plans}
+              siteConfig={siteConfig}
               onRefresh={refreshAll}
               onNotify={notify}
             />

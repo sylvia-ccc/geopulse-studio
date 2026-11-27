@@ -10,7 +10,7 @@ license: mit
 short_description: Open-Source GEO (AI Search Optimization) Studio
 ---
 
-# 🚀 GeoPulse Studio 2.0 — 智引 GEO 商用生成式引擎优化与发布系统
+# 🚀 GeoPulse Studio 3.0 — 智引 GEO 商用生成式引擎优化与发布系统
 
 > **Open-Source Commercial Generative Engine Optimization (GEO / AEO) SaaS Platform**
 > Built for SMBs, Solo Founders, Content Teams & Digital Agencies to architect, audit, publish, and track high-citation brand content across **Doubao/Yuanbao, DeepSeek/Kimi/Metaso, ChatGPT Search, Perplexity, and Google AI Overviews (Gemini)**.
@@ -21,9 +21,16 @@ short_description: Open-Source GEO (AI Search Optimization) Studio
 [![Docker Ready](https://img.shields.io/badge/Docker-Production%20Ready-2496ED)](Dockerfile)
 
 ### 🔗 Live Demos & Links
+- **Official Live Commercial Site (HTTPS)**: https://geo.workagentpro.com *(Demo Admin: `demo@geopulse.ai` / `Demo123456!` · 1-Click Login Available)*
+- **Free No-Login GEO Grader Tool**: https://geo.workagentpro.com/audit
 - **GitHub Repository**: https://github.com/sylvia-ccc/geopulse-studio
 - **Hugging Face Space**: https://huggingface.co/spaces/sylviacccyu/geopulse-studio
-- **US Live Demo Server**: https://geo.workagentpro.com *(Demo Admin: `demo@geopulse.ai` / `Demo123456!` · 1-Click Login Available)*
+
+### 🆕 What's New in v3.0
+- **No-Login Public GEO Grader (`/` & `/audit`)**: Viral lead-magnet tool allowing visitors to score product copy across 5 AI engines or audit any live website's AI crawler readiness without signing up.
+- **9 One-Click LLM Provider Presets**: DeepSeek, Zhipu GLM (free tier), SiliconFlow, Alibaba Qwen, Moonshot Kimi, Volcengine Doubao, Google Gemini, OpenAI, and OpenRouter — auto-fills Base URL, Model, and API Key guide.
+- **Zero-API-Key Expert Prompt Pack Mode**: Users without any API key can copy a weight-engineered GEO Prompt Pack, run it in their own DeepSeek/Doubao/ChatGPT web chat, and paste the output back to auto-extract Title, Direct Answer Capsule, FAQs, and 4-in-1 JSON-LD.
+- **Zero-Code Commercial Checkout & Branding Console**: Admins configure live brand title, announcement banner, Pro/Enterprise checkout URLs (Stripe / 小报童 / 发卡网), and support/acquisition contact right in the Admin Console.
 
 ---
 

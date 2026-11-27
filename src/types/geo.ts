@@ -237,6 +237,16 @@ export interface UserAccount {
   createdAt: string;
 }
 
+export interface CommercialSiteSettings {
+  brandTitle: string;
+  contactWechatOrEmail: string;
+  checkoutProUrl: string;
+  checkoutEnterpriseUrl: string;
+  acquisitionNote: string;
+  announcement: string;
+  strictBilling: boolean;
+}
+
 export interface PlanQuota {
   tier: PlanTier;
   label: string;

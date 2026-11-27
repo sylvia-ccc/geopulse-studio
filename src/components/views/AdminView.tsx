@@ -8,10 +8,12 @@ import {
   KeyRound,
   Loader2,
   Plus,
+  Save,
   Shield,
+  Store,
   Users,
 } from "lucide-react";
-import type { PlanTier, RedemptionCode, UserRole } from "@/types/geo";
+import type { CommercialSiteSettings, PlanTier, RedemptionCode, UserRole } from "@/types/geo";
 
 interface AdminUserRow {
   id: string;
@@ -52,22 +54,59 @@ export function AdminView({ onNotify }: Props) {
   const [genNote, setGenNote] = useState("");
   const [generating, setGenerating] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [siteCfg, setSiteCfg] = useState<CommercialSiteSettings | null>(null);
+  const [savingSite, setSavingSite] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/overview");
+      const [res, cfgRes] = await Promise.all([
+        fetch("/api/admin/overview"),
+        fetch("/api/site-config"),
+      ]);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "加载运营数据失败");
       setStats(data.stats);
       setUsers(data.users || []);
       setCodes(data.codes || []);
+      if (cfgRes.ok) {
+        const cfgJson = await cfgRes.json();
+        setSiteCfg(cfgJson.config || null);
+      }
     } catch (err) {
       onNotify(err instanceof Error ? err.message : "加载失败", "error");
     } finally {
       setLoading(false);
     }
   }, [onNotify]);
+
+  const handleSaveSiteConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!siteCfg) return;
+    setSavingSite(true);
+    try {
+      const res = await fetch("/api/site-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandTitle: siteCfg.brandTitle,
+          announcement: siteCfg.announcement,
+          checkoutProUrl: siteCfg.checkoutProUrl,
+          checkoutEnterpriseUrl: siteCfg.checkoutEnterpriseUrl,
+          contactWechatOrEmail: siteCfg.contactWechatOrEmail,
+          acquisitionNote: siteCfg.acquisitionNote,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "保存失败");
+      setSiteCfg(data.config);
+      onNotify("站点品牌与商业收款配置已生效（首页与套餐页同步更新）");
+    } catch (err) {
+      onNotify(err instanceof Error ? err.message : "保存失败", "error");
+    } finally {
+      setSavingSite(false);
+    }
+  };
 
   useEffect(() => {
     void loadData();
@@ -298,6 +337,94 @@ export function AdminView({ onNotify }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Commercial Site Branding & Checkout Links Config */}
+      {siteCfg && (
+        <form
+          onSubmit={handleSaveSiteConfig}
+          className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <Store className="h-4 w-4 text-indigo-600" />
+                商用站点品牌与收款链接配置（零代码实时生效）
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                填入你的小报童 / 面包多 / 爱发电 / 发卡网 / Stripe 收款链接，首页定价区与升级按钮立即接入真实变现闭环
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={savingSite}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {savingSite ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              保存站点商业配置
+            </button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">站点品牌名称</label>
+              <input
+                value={siteCfg.brandTitle}
+                onChange={(e) => setSiteCfg({ ...siteCfg, brandTitle: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                商务/客服联系方式（展示于首页底部与升级提示）
+              </label>
+              <input
+                value={siteCfg.contactWechatOrEmail}
+                onChange={(e) => setSiteCfg({ ...siteCfg, contactWechatOrEmail: e.target.value })}
+                placeholder="例如：微信：your_wechat ｜ 邮箱：hi@yourdomain.com"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                Pro 版购买收款链接（选填，留空则引导登录兑换）
+              </label>
+              <input
+                value={siteCfg.checkoutProUrl}
+                onChange={(e) => setSiteCfg({ ...siteCfg, checkoutProUrl: e.target.value })}
+                placeholder="https://你的发卡网或Stripe/小报童收款链接"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                Enterprise 版购买收款链接（选填）
+              </label>
+              <input
+                value={siteCfg.checkoutEnterpriseUrl}
+                onChange={(e) => setSiteCfg({ ...siteCfg, checkoutEnterpriseUrl: e.target.value })}
+                placeholder="https://你的企业年卡收款链接"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-slate-700">首页顶部公告条（留空则隐藏）</label>
+              <input
+                value={siteCfg.announcement}
+                onChange={(e) => setSiteCfg({ ...siteCfg, announcement: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-slate-700">开源/私有化/收购合作说明</label>
+              <input
+                value={siteCfg.acquisitionNote}
+                onChange={(e) => setSiteCfg({ ...siteCfg, acquisitionNote: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+              />
+            </div>
+          </div>
+        </form>
+      )}
 
       {/* Tenant Users Table */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
