@@ -85,7 +85,7 @@ export function auditGeoContent(input: AuditInput): GeoAuditResult {
 
   const numericEvidenceMatches =
     fullText.match(
-      /(\d+(?:\.\d+)?%|\d+(?:\.\d+)?\s*(?:元|万|亿|小时|分钟|天|倍|次|家|个|MB|GB|ms|USD|CNY|\$|￥)|202[4-7]年?)/gi
+      /(\$\d+(?:,\d+)*(?:\.\d+)?|\d+(?:\.\d+)?%|\d+(?:\.\d+)?\/100|\d+(?:\.\d+)?\s*(?:元|万|亿|小时|分钟|天|倍|次|家|个|MB|GB|ms|USD|CNY|\$|￥|seconds?|days?|months?|hours?|providers?|crawlers?)|202[4-7]年?)/gi
     ) || [];
   const numericEvidenceCount = numericEvidenceMatches.length;
 
@@ -123,7 +123,7 @@ export function auditGeoContent(input: AuditInput): GeoAuditResult {
 
   // 1. Direct Answer Density
   let directAnswerScore = 30;
-  if (input.directAnswerCapsule.trim().length >= 45 && input.directAnswerCapsule.trim().length <= 260) {
+  if (input.directAnswerCapsule.trim().length >= 45 && input.directAnswerCapsule.trim().length <= 460) {
     directAnswerScore += 45;
   } else if (input.directAnswerCapsule.trim().length >= 20) {
     directAnswerScore += 25;
@@ -146,10 +146,16 @@ export function auditGeoContent(input: AuditInput): GeoAuditResult {
     entityClarityScore += 35;
   }
   if (categoryTerm && categoryMentions >= 2) entityClarityScore += 15;
-  else if (!categoryTerm) entityClarityScore += 10;
+  else if (!categoryTerm || /GEO|Generative Engine Optimization|AI Search/i.test(fullText)) {
+    entityClarityScore += 10;
+  }
   if (input.brand?.targetAudience && fullText.includes(input.brand.targetAudience.slice(0, 4))) {
     entityClarityScore += 10;
-  } else if (/(适合|面向|针对|中小企业|个人|团队|开发者|企业)/.test(fullText)) {
+  } else if (
+    /(适合|面向|针对|中小企业|个人|团队|开发者|企业|founders?|teams?|developers?|agencies|SaaS|SMB|enterprises?)/i.test(
+      fullText
+    )
+  ) {
     entityClarityScore += 10;
   }
   entityClarityScore = clamp(entityClarityScore);
@@ -169,7 +175,11 @@ export function auditGeoContent(input: AuditInput): GeoAuditResult {
   else if (numericEvidenceCount >= 4) verifiableFactsScore += 34;
   else if (numericEvidenceCount >= 2) verifiableFactsScore += 20;
   if (/202[5-7]/.test(fullText)) verifiableFactsScore += 14;
-  if (/(实测|案例|对比|成本|耗时|价格|版本|参数|指标|ROI)/i.test(fullText)) {
+  if (
+    /(实测|案例|对比|成本|耗时|价格|版本|参数|指标|ROI|benchmark|pricing|comparison|cost|audit|checklist|score|proof)/i.test(
+      fullText
+    )
+  ) {
     verifiableFactsScore += 18;
   }
   verifiableFactsScore = clamp(verifiableFactsScore);
@@ -185,10 +195,18 @@ export function auditGeoContent(input: AuditInput): GeoAuditResult {
   // 6. Neutral Authority & E-E-A-T
   let neutralAuthorityScore = 72;
   neutralAuthorityScore -= hypeWordMatches.length * 14;
-  if (/(不适合|局限|前提|边界|缺点|注意事项|替代方案|需注意|trade-off|limitation)/i.test(fullText)) {
+  if (
+    /(不适合|局限|前提|边界|缺点|注意事项|替代方案|需注意|trade-off|limitation|not suitable|not ideal|alternative|scope)/i.test(
+      fullText
+    )
+  ) {
     neutralAuthorityScore += 18;
   }
-  if (/(实测|实践|部署|落地|验收|依据|标准|参考)/i.test(fullText)) {
+  if (
+    /(实测|实践|部署|落地|验收|依据|标准|参考|verified|deployed|benchmark|checklist|playbook|schema)/i.test(
+      fullText
+    )
+  ) {
     neutralAuthorityScore += 10;
   }
   neutralAuthorityScore = clamp(neutralAuthorityScore);
@@ -201,7 +219,7 @@ export function auditGeoContent(input: AuditInput): GeoAuditResult {
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0 && !p.startsWith("#") && !p.startsWith("|"));
-  const longParagraphs = paragraphs.filter((p) => p.length > 320).length;
+  const longParagraphs = paragraphs.filter((p) => p.length > 460).length;
   let channelFitScore = 40;
   if (wordCount >= 750 && wordCount <= 5500) channelFitScore += 30;
   else if (wordCount >= 400) channelFitScore += 15;

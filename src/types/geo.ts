@@ -225,8 +225,14 @@ export interface RedemptionCode {
 
 export type PlatformAccountType =
   | "geo_network"
-  | "wordpress"
   | "devto"
+  | "qiita"
+  | "bluesky"
+  | "telegraph"
+  | "github_pages"
+  | "hashnode"
+  | "ghost"
+  | "wordpress"
   | "webhook"
   | "zhihu_managed"
   | "wechat_managed"
@@ -238,6 +244,7 @@ export interface PlatformAccount {
   name: string;
   platformType: PlatformAccountType;
   deliveryMode: "auto_api" | "managed_review";
+  region: string;
   handleOrDomain: string;
   authorityBadge: string;
   description: string;

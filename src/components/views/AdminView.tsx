@@ -79,16 +79,17 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
   const [savingSite, setSavingSite] = useState(false);
   const [seedingGrowth, setSeedingGrowth] = useState(false);
 
-  // New platform account state
+  // New platform account state (Global Official Auto-API First)
   const [accName, setAccName] = useState("");
-  const [accType, setAccType] = useState<PlatformAccountType>("wordpress");
+  const [accType, setAccType] = useState<PlatformAccountType>("devto");
   const [accMode, setAccMode] = useState<"auto_api" | "managed_review">("auto_api");
+  const [accRegion, setAccRegion] = useState("US / EU");
   const [accHandle, setAccHandle] = useState("");
   const [accBadge, setAccBadge] = useState("");
   const [accDesc, setAccDesc] = useState("");
-  const [accCost, setAccCost] = useState(29);
-  const [accUrl, setAccUrl] = useState("");
-  const [accHeader, setAccHeader] = useState("Authorization");
+  const [accCost, setAccCost] = useState(25);
+  const [accUrl, setAccUrl] = useState("https://dev.to/api/articles");
+  const [accHeader, setAccHeader] = useState("api-key");
   const [accCred, setAccCred] = useState("");
   const [savingAcc, setSavingAcc] = useState(false);
 
@@ -226,6 +227,7 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
           name: accName,
           platformType: accType,
           deliveryMode: accMode,
+          region: accRegion,
           handleOrDomain: accHandle,
           authorityBadge: accBadge,
           description: accDesc,
@@ -761,17 +763,17 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
             className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-5"
           >
             <h2 className="text-sm font-bold text-slate-900">
-              绑定平台自有发布账号（客户可付费调用）
+              绑定全球官方 API 账号（客户付费即秒发）
             </h2>
             <p className="text-xs text-slate-500">
-              支持连接你的 WordPress 矩阵站、Dev.to、Webhook（自动秒发，密钥 AES-256-GCM 加密）或知乎/公众号/小红书自营评测号（审核代发）。
+              优先接入海外高付费区官方 API：DEV.to、Qiita（日本）、Bluesky、GitHub Pages、Telegraph、Hashnode、Ghost JWT 与 WordPress（密钥 AES-256-GCM 加密存储）。
             </p>
 
             <input
               required
               value={accName}
               onChange={(e) => setAccName(e.target.value)}
-              placeholder="渠道名称，如：出海 SaaS 英文评测站 (WordPress)"
+              placeholder="渠道名称，如：DEV.to · GeoPulse Research (欧美开发者社区)"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
             />
             <div className="grid grid-cols-2 gap-2.5">
@@ -780,21 +782,71 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
                 onChange={(e) => {
                   const t = e.target.value as PlatformAccountType;
                   setAccType(t);
-                  setAccMode(
-                    ["geo_network", "wordpress", "devto", "webhook"].includes(t)
-                      ? "auto_api"
-                      : "managed_review"
-                  );
+                  const autoTypes: PlatformAccountType[] = [
+                    "geo_network",
+                    "devto",
+                    "qiita",
+                    "bluesky",
+                    "telegraph",
+                    "github_pages",
+                    "hashnode",
+                    "ghost",
+                    "wordpress",
+                    "webhook",
+                  ];
+                  const isAuto = autoTypes.includes(t);
+                  setAccMode(isAuto ? "auto_api" : "managed_review");
+                  if (t === "devto") {
+                    setAccRegion("US / EU");
+                    setAccUrl("https://dev.to/api/articles");
+                    setAccHeader("api-key");
+                  } else if (t === "qiita") {
+                    setAccRegion("Japan");
+                    setAccUrl("https://qiita.com/api/v2/items");
+                    setAccHeader("Authorization");
+                  } else if (t === "bluesky") {
+                    setAccRegion("US / EU");
+                    setAccUrl("https://bsky.social");
+                    setAccHeader("AppPassword");
+                  } else if (t === "telegraph") {
+                    setAccRegion("Global");
+                    setAccUrl("https://api.telegra.ph/createPage");
+                    setAccHeader("access_token");
+                  } else if (t === "github_pages") {
+                    setAccRegion("Global");
+                    setAccUrl("sylvia-ccc/geopulse-geo-hub");
+                    setAccHeader("Authorization");
+                  } else if (t === "hashnode") {
+                    setAccRegion("US / EU");
+                    setAccUrl("");
+                    setAccHeader("Authorization");
+                  } else if (t === "ghost") {
+                    setAccRegion("US / EU");
+                    setAccUrl("https://blog.example.com");
+                    setAccHeader("Ghost JWT");
+                  } else if (t === "wordpress" || t === "webhook") {
+                    setAccRegion("Global");
+                    setAccUrl("");
+                    setAccHeader("Authorization");
+                  } else {
+                    setAccRegion("CN (Optional)");
+                  }
                 }}
                 className="rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
               >
-                <option value="wordpress">WordPress 官方 API（自动）</option>
-                <option value="devto">Dev.to 官方 API（自动）</option>
-                <option value="webhook">自定义 Webhook / Ghost（自动）</option>
-                <option value="zhihu_managed">知乎垂直矩阵号（审核代发）</option>
-                <option value="wechat_managed">微信公众号矩阵（审核代发）</option>
-                <option value="xiaohongshu_managed">小红书测评矩阵（审核代发）</option>
-                <option value="bundle_managed">多平台组合代发包（审核代发）</option>
+                <option value="devto">⚡ DEV.to 官方 API（欧美免费）</option>
+                <option value="qiita">⚡ Qiita 官方 API v2（日本免费）</option>
+                <option value="bluesky">⚡ Bluesky ATProto API（欧美免费）</option>
+                <option value="github_pages">⚡ GitHub Pages API（全球 DA96）</option>
+                <option value="telegraph">⚡ Telegraph 官方 API（全球秒发）</option>
+                <option value="ghost">⚡ Ghost CMS Admin JWT（欧美专栏）</option>
+                <option value="hashnode">⚡ Hashnode GraphQL API（欧美 Pro）</option>
+                <option value="wordpress">⚡ WordPress REST API（全球独立站）</option>
+                <option value="webhook">⚡ 自定义 Webhook（自动）</option>
+                <option value="zhihu_managed">🛡️ 知乎矩阵（国内人工可选）</option>
+                <option value="wechat_managed">🛡️ 公众号矩阵（国内人工可选）</option>
+                <option value="xiaohongshu_managed">🛡️ 小红书矩阵（国内人工可选）</option>
+                <option value="bundle_managed">🛡️ 国内组合包（人工可选）</option>
               </select>
               <input
                 type="number"
@@ -806,18 +858,24 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                value={accRegion}
+                onChange={(e) => setAccRegion(e.target.value)}
+                placeholder="目标区域（US / EU / Japan）"
+                className="rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
+              />
               <input
                 value={accHandle}
                 onChange={(e) => setAccHandle(e.target.value)}
-                placeholder="账号名 / 站点域名"
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                placeholder="账号名 / 域名"
+                className="rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
               />
               <input
                 value={accBadge}
                 onChange={(e) => setAccBadge(e.target.value)}
-                placeholder="权重标签，如：Perplexity 高引源"
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                placeholder="权重标签，如 DA 85+"
+                className="rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
               />
             </div>
 

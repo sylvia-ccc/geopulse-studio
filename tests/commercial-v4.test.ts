@@ -37,10 +37,10 @@ describe("v4.0 Managed Distribution Marketplace, Credits & Growth Pack", () => {
       expect(redeemed.creditsBalance).toBe(300);
     }
 
-    // 3. Official GeoPulse Self-Promotion GEO Growth Pack (idempotent)
+    // 3. Official GeoPulse Self-Promotion GEO Growth Pack (idempotent: 3 ZH + 2 EN = 5 flagship articles)
     const growth = mkt.seedOfficialGeoGrowthPack(demo!.id, "https://geo.workagentpro.com");
-    expect(growth.createdCount).toBe(3);
-    expect(growth.articles).toHaveLength(3);
+    expect(growth.createdCount).toBe(5);
+    expect(growth.articles).toHaveLength(5);
     for (const a of growth.articles) {
       expect(a.geoScore).toBeGreaterThanOrEqual(85);
     }

@@ -263,6 +263,7 @@ function openDatabase(): SqliteDatabase {
   ensureColumn("citation_checks", "competitors_mentioned_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn("citation_checks", "has_hallucination", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("citation_checks", "funnel_stage", "TEXT NOT NULL DEFAULT 'comparison'");
+  ensureColumn("platform_accounts", "region", "TEXT NOT NULL DEFAULT 'Global'");
 
   globalForDb.__geopulseDb = db;
   if (!globalForDb.__geopulseSeeded) {
@@ -272,6 +273,13 @@ function openDatabase(): SqliteDatabase {
 
   // Ensure default platform publishing marketplace slots exist even on upgraded production DBs
   seedDefaultPlatformAccountsIfEmpty(db);
+
+  // Tag domestic manual-review channels cleanly as CN (Optional) and sort global auto-API channels first
+  db.prepare(
+    `UPDATE platform_accounts
+     SET region = 'CN (Optional)', sort_order = CASE WHEN sort_order < 50 THEN sort_order + 50 ELSE sort_order END
+     WHERE delivery_mode = 'managed_review' AND region = 'Global'`
+  ).run();
 
   // Ensure demo account and configured ADMIN_EMAIL always hold admin role
   db.prepare("UPDATE users SET role = 'admin' WHERE email = 'demo@geopulse.ai'").run();

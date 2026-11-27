@@ -49,6 +49,7 @@ export function MarketplaceView({
   const [redeemCode, setRedeemCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
   const [historyTab, setHistoryTab] = useState<"orders" | "ledger">("orders");
+  const [showCnManaged, setShowCnManaged] = useState(false);
 
   const loadMarketplace = useCallback(async () => {
     const res = await fetch("/api/marketplace");
@@ -155,13 +156,13 @@ export function MarketplaceView({
         <div>
           <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-300">
             <Rocket className="h-3.5 w-3.5" />
-            免养号 · 免排版 · 合规高权重矩阵代发
+            Global Official Auto-API First · 欧美/日本/全球高权重官方接口秒级直发
           </div>
           <h1 className="mt-2.5 text-2xl font-extrabold tracking-tight">
-            平台托管代发市场（Managed GEO Distribution）
+            全球官方 API 托管发布市场（Global GEO Auto-Distribution）
           </h1>
           <p className="mt-1 text-sm text-slate-300">
-            不想自己注册和维护知乎、公众号、小红书或独立站？选好高分 GEO 文章，直接通过平台自营垂直评测矩阵与高权重专栏发布，未通过审核自动全额退还积分。
+            优先接入 DEV.to（欧美）、Qiita（日本）、GitHub Pages（DA 96）、Telegraph、Bluesky、Ghost 与 WordPress 等官方全自动 API：下单即秒发、自动写入 Canonical URL 与 JSON-LD；发布失败自动全额退还积分。
           </p>
         </div>
 
@@ -252,22 +253,21 @@ export function MarketplaceView({
         )}
       </div>
 
-      {/* Step 2: Choose Managed Platform Channels */}
-      <div>
-        <h2 className="mb-3 text-sm font-bold text-slate-900">
-          第二步：选择目标高权重发布渠道（自动 API 渠道秒级上线，矩阵评测号 24h 内人工合规代发）
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((acc) => {
-            const isAuto = acc.deliveryMode === "auto_api";
-            const busy = submittingId === acc.id;
-            return (
-              <div
-                key={acc.id}
-                className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-indigo-300 hover:shadow-md"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2">
+      {/* Step 2: Global Official Auto-API Channels (Primary) */}
+      {(() => {
+        const autoApiAccounts = accounts.filter((a) => a.deliveryMode === "auto_api");
+        const managedAccounts = accounts.filter((a) => a.deliveryMode !== "auto_api");
+        const renderCard = (acc: PlatformAccount) => {
+          const isAuto = acc.deliveryMode === "auto_api";
+          const busy = submittingId === acc.id;
+          return (
+            <div
+              key={acc.id}
+              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-indigo-300 hover:shadow-md"
+            >
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                         isAuto
@@ -275,44 +275,87 @@ export function MarketplaceView({
                           : "bg-indigo-50 text-indigo-700"
                       }`}
                     >
-                      {isAuto ? "⚡ 官方协议秒发" : "🛡️ 平台矩阵审核代发"}
+                      {isAuto ? "⚡ 官方 API 秒发" : "🛡️ 人工审核代发"}
                     </span>
-                    <span className="text-base font-black text-indigo-700">
-                      {acc.creditCost} <span className="text-xs font-semibold text-slate-400">积分</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                      {acc.region || "Global"}
                     </span>
                   </div>
-
-                  <h3 className="mt-3 text-base font-bold text-slate-900">{acc.name}</h3>
-                  <div className="mt-1 text-xs font-medium text-slate-500">
-                    {acc.handleOrDomain}
-                  </div>
-                  {acc.authorityBadge && (
-                    <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                      <ShieldCheck className="h-3 w-3" />
-                      {acc.authorityBadge}
-                    </div>
-                  )}
-                  <p className="mt-2.5 text-xs leading-relaxed text-slate-600">{acc.description}</p>
+                  <span className="text-base font-black text-indigo-700">
+                    {acc.creditCost} <span className="text-xs font-semibold text-slate-400">积分</span>
+                  </span>
                 </div>
 
+                <h3 className="mt-3 text-base font-bold text-slate-900">{acc.name}</h3>
+                <div className="mt-1 font-mono text-[11px] font-medium text-slate-500">
+                  {acc.handleOrDomain}
+                </div>
+                {acc.authorityBadge && (
+                  <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                    <ShieldCheck className="h-3 w-3" />
+                    {acc.authorityBadge}
+                  </div>
+                )}
+                <p className="mt-2.5 text-xs leading-relaxed text-slate-600">{acc.description}</p>
+              </div>
+
+              <button
+                type="button"
+                disabled={busy || !selectedArticle}
+                onClick={() => void handleOrder(acc)}
+                className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-600 disabled:opacity-50"
+              >
+                {busy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                支付 {acc.creditCost} 积分 · {isAuto ? "立即 API 自动发布" : "提交平台代发"}
+              </button>
+            </div>
+          );
+        };
+
+        return (
+          <div className="space-y-5">
+            <div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-bold text-slate-900">
+                  第二步：全球高权重官方 API 全自动通道（{autoApiAccounts.length} 个已就绪 · 秒级上线返链接）
+                </h2>
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  支持 ChatGPT Search / Perplexity / Google AIO / DeepSeek
+                </span>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {autoApiAccounts.map(renderCard)}
+              </div>
+            </div>
+
+            {managedAccounts.length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <button
                   type="button"
-                  disabled={busy || !selectedArticle}
-                  onClick={() => void handleOrder(acc)}
-                  className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-600 disabled:opacity-50"
+                  onClick={() => setShowCnManaged((v) => !v)}
+                  className="flex w-full items-center justify-between text-left text-xs font-bold text-slate-700 hover:text-indigo-700"
                 >
-                  {busy ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  支付 {acc.creditCost} 积分 · {isAuto ? "立即自动发布" : "提交平台代发"}
+                  <span>
+                    国内人工审单代发通道（可选 · 知乎 / 公众号 / 小红书，共 {managedAccounts.length} 个）
+                  </span>
+                  <span className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                    {showCnManaged ? "收起 ▲" : "展开查看 ▼"}
+                  </span>
                 </button>
+                {showCnManaged && (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {managedAccounts.map(renderCard)}
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
-      </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Step 3: Orders & Credit Ledger */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">

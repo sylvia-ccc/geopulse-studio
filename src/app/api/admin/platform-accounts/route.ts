@@ -23,19 +23,26 @@ const createSchema = z.object({
   name: z.string().min(2, "请填写渠道/账号名称").max(100),
   platformType: z.enum([
     "geo_network",
-    "wordpress",
     "devto",
+    "qiita",
+    "bluesky",
+    "telegraph",
+    "github_pages",
+    "hashnode",
+    "ghost",
+    "wordpress",
     "webhook",
     "zhihu_managed",
     "wechat_managed",
     "xiaohongshu_managed",
     "bundle_managed",
   ]),
-  deliveryMode: z.enum(["auto_api", "managed_review"]).default("managed_review"),
+  deliveryMode: z.enum(["auto_api", "managed_review"]).default("auto_api"),
+  region: z.string().max(40).optional().default("Global"),
   handleOrDomain: z.string().max(120).optional().default(""),
   authorityBadge: z.string().max(100).optional().default(""),
   description: z.string().max(400).optional().default(""),
-  creditCost: z.number().int().min(0).max(10000).default(30),
+  creditCost: z.number().int().min(0).max(10000).default(25),
   endpointUrl: z.string().max(300).optional().default(""),
   authHeader: z.string().max(80).optional().default("Authorization"),
   credential: z.string().max(400).optional().default(""),
@@ -68,6 +75,10 @@ export async function PATCH(req: NextRequest) {
   const body = (await req.json()) as {
     id?: string;
     name?: string;
+    region?: string;
+    handleOrDomain?: string;
+    authorityBadge?: string;
+    description?: string;
     creditCost?: number;
     enabled?: boolean;
     endpointUrl?: string;
@@ -77,6 +88,10 @@ export async function PATCH(req: NextRequest) {
 
   const updated = updatePlatformAccount(body.id, {
     name: body.name,
+    region: body.region,
+    handleOrDomain: body.handleOrDomain,
+    authorityBadge: body.authorityBadge,
+    description: body.description,
     creditCost: body.creditCost,
     enabled: body.enabled,
     endpointUrl: body.endpointUrl,
