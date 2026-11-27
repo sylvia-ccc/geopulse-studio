@@ -20,31 +20,37 @@ describe("GeoPulse Studio v5.0 White-Label, Autopilot, Payment Webhook & Audit-t
     expect(wl.verifyWhiteLabelReportToken("brd_123", "usr_abc", "tampered_token_123456")).toBe(false);
   });
 
-  it("seeds official GEO Autopilot queue and runs next scheduled article idempotently with score >= 85", async () => {
+  it("seeds research topics and automatically publishes the approved source-backed tutorial", async () => {
     const dbMod = await import("@/lib/db");
     const ap = await import("@/lib/autopilot");
     const demo = dbMod.findUserByEmail("demo@geopulse.ai")!;
-
+    const publishedBefore = dbMod.getDb().prepare("SELECT COUNT(*) AS n FROM articles WHERE status = 'published'").get()?.n;
     const seeded = ap.seedOfficialAutopilotQueue(demo.id, "https://geo.workagentpro.com");
+    expect(dbMod.getDb().prepare("SELECT COUNT(*) AS n FROM articles WHERE status = 'published'").get()?.n).toBe(publishedBefore);
     expect(seeded.addedCount).toBe(6);
-    expect(seeded.topics.length).toBe(6);
-
-    // Run 1st queued English topic locally (skipping external HTTP blast in offline unit test)
-    const run1 = await ap.runNextAutopilotJob({
-      baseUrl: "https://geo.workagentpro.com",
-      userId: demo.id,
-      skipExternalBlast: true,
+    expect(ap.seedOfficialAutopilotQueue(demo.id, "https://geo.workagentpro.com").addedCount).toBe(0);
+    const source = await import("@/lib/autopilot-content");
+    const topic = seeded.topics.find((item) => item.titleHint.includes("White-Label"))!;
+    const verified = source.buildVerifiedAutopilotContent(topic, "https://geo.workagentpro.com")!;
+    expect(verified).not.toBeNull();
+    dbMod.getDb().prepare("UPDATE growth_topics SET created_at = ? WHERE id = ?").run("2020-01-01T00:00:00.000Z", topic.id);
+    const run = await ap.runNextAutopilotJob({
+      baseUrl: "https://geo.workagentpro.com", userId: demo.id, skipExternalBlast: true,
     });
-    expect(run1.ok).toBe(true);
-    if (run1.ok) {
-      expect(run1.ran).toBe(true);
-      expect(run1.geoScore).toBeGreaterThanOrEqual(85);
-      expect(run1.publishedUrls?.[0]).toContain("https://geo.workagentpro.com/p/");
-    }
-
-    const topicsAfter = ap.listGrowthTopics(demo.id);
-    expect(topicsAfter.filter((t) => t.status === "published")).toHaveLength(1);
-    expect(topicsAfter.filter((t) => t.status === "queued")).toHaveLength(5);
+    expect(run.ok).toBe(true);
+    if (!run.ok) throw new Error(run.error);
+    expect(run.ran).toBe(true);
+    expect(run.topic?.status).toBe("published");
+    const article = dbMod.getArticleById(run.topic!.articleId)!;
+    expect(article.status).toBe("published");
+    expect(article.title).toBe(verified.title);
+    expect(article.markdownContent).toContain("## Sources and scope");
+    for (const url of verified.sourceUrls) expect(article.markdownContent).toContain(url);
+    expect(article.markdownContent).toContain(`<!-- autopilot-template:${verified.key} -->`);
+    expect(article.markdownContent).not.toContain(ap.AUTOPILOT_REVIEW_MARKER);
+    expect(run.publishedUrls).toEqual([`https://geo.workagentpro.com/p/${article.slug}`]);
+    expect(ap.listGrowthTopics(demo.id).filter((t) => t.status === "published")).toHaveLength(1);
+    expect(ap.listGrowthTopics(demo.id).filter((t) => t.status === "queued")).toHaveLength(5);
   });
 
   it("verifies LemonSqueezy HMAC signatures, auto-credits existing users, mints codes for new buyers, and blocks duplicate replays", async () => {

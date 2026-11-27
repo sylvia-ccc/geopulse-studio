@@ -3,10 +3,16 @@ import type { Metadata } from "next";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PublicAuditWidget } from "@/components/PublicAuditWidget";
 
+const title = "免费 GEO 网站与内容体检";
+const description = "免登录检查官网的 robots.txt、LLM 文本与结构化数据配置，或分析文案的结构与可读性。";
 export const metadata: Metadata = {
-  title: "免费 GEO 收录体检与 AI 权重测算工具 — GeoPulse Studio",
-  description:
-    "免登录实时检测你的官网是否放行 GPTBot、PerplexityBot、Google-Extended 与 Bytespider，或粘贴产品文案即时测算五大 AI 搜索引擎收录得分。",
+  title, description,
+  alternates: { canonical: "/audit" },
+  openGraph: {
+    type: "website", url: "/audit", title, description,
+    images: [{ url: "/api/og?title=Free%20GEO%20Website%20Audit", width: 1200, height: 630, alt: title }],
+  },
+  twitter: { card: "summary_large_image", title, description, images: ["/api/og?title=Free%20GEO%20Website%20Audit"] },
 };
 
 export default function PublicAuditPage() {
@@ -22,11 +28,11 @@ export default function PublicAuditPage() {
             返回 GeoPulse Studio 首页
           </Link>
           <Link
-            href="/login?demo=1"
+            href="/login"
             className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            进入完整工作台
+            登录完整工作台
           </Link>
         </div>
       </header>

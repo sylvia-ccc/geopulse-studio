@@ -413,7 +413,7 @@ export function AppShell() {
             />
           )}
 
-          {tab === "outreach" && <OutreachView onNotify={notify} />}
+          {tab === "outreach" && <OutreachView onNotify={notify} isAdmin={me.user.role === "admin"} />}
 
           {tab === "monitor" && (
             <MonitorView

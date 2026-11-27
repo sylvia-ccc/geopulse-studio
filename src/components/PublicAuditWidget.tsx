@@ -58,19 +58,34 @@ export function PublicAuditWidget() {
   const [error, setError] = useState("");
   const [siteReport, setSiteReport] = useState<SitePublicReport | null>(null);
   const [contentAudit, setContentAudit] = useState<ContentPublicAudit | null>(null);
+  const [auditToken, setAuditToken] = useState("");
+  const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [captureMessage, setCaptureMessage] = useState("");
+  const [captureError, setCaptureError] = useState("");
   const autoRanRef = useRef(false);
 
   const runSiteAuditDirect = useCallback(async (targetUrl: string) => {
     setError("");
     setLoading(true);
+    setAuditToken("");
+    setCaptureMessage("");
+    setCaptureError("");
+    setConsent(false);
     try {
       const res = await fetch("/api/public/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "site", url: targetUrl }),
+        body: JSON.stringify({
+          mode: "site", url: targetUrl,
+          lid: new URLSearchParams(window.location.search).get("lid") || undefined,
+          lsig: new URLSearchParams(window.location.search).get("lsig") || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "诊断失败");
+      setAuditToken(data.auditToken || "");
       setSiteReport(data.report);
       setContentAudit(null);
     } catch (err) {
@@ -98,10 +113,17 @@ export function PublicAuditWidget() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    setAuditToken("");
+    setCaptureMessage("");
+    setCaptureError("");
+    setConsent(false);
     try {
       const payload =
         mode === "site"
-          ? { mode: "site", url }
+          ? { mode: "site", url,
+              lid: new URLSearchParams(window.location.search).get("lid") || undefined,
+              lsig: new URLSearchParams(window.location.search).get("lsig") || undefined,
+            }
           : { mode: "content", brandName, category, content };
       const res = await fetch("/api/public/audit", {
         method: "POST",
@@ -110,6 +132,7 @@ export function PublicAuditWidget() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "诊断失败");
+      setAuditToken(data.auditToken || "");
       if (mode === "site") {
         setSiteReport(data.report);
         setContentAudit(null);
@@ -122,6 +145,24 @@ export function PublicAuditWidget() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCapture = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCaptureBusy(true);
+    setCaptureError("");
+    try {
+      const response = await fetch("/api/public/capture-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, consent, auditToken }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "保存失败，请稍后重试");
+      setCaptureMessage(data.message);
+    } catch (err) {
+      setCaptureError(err instanceof Error ? err.message : "保存失败，请稍后重试");
+    } finally { setCaptureBusy(false); }
   };
 
   return (
@@ -281,13 +322,13 @@ export function PublicAuditWidget() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-900 px-4 py-3 text-xs text-white">
             <span className="inline-flex items-center gap-1.5 font-semibold">
               <Lock className="h-3.5 w-3.5 text-emerald-400" />
-              登录工作台即可「一键补全优化」拉升至 90+ 分，并自动生成 JSON-LD 发布专栏
+              登录工作台可编辑优化文案，并生成带 JSON-LD 的发布专栏
             </span>
             <Link
-              href="/login?demo=1"
+              href="/login"
               className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3.5 py-1.5 font-bold text-slate-950 hover:bg-emerald-400"
             >
-              免费体验一键提权
+              登录编辑优化
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -363,7 +404,7 @@ export function PublicAuditWidget() {
               共检测到 {siteReport.totalRecommendations} 项可优化建议，登录工作台查看完整修复代码并一键托管合规 GEO 专栏
             </span>
             <Link
-              href="/login?demo=1"
+              href="/login"
               className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3.5 py-1.5 font-bold text-slate-950 hover:bg-emerald-400"
             >
               解锁完整报告
@@ -371,6 +412,27 @@ export function PublicAuditWidget() {
             </Link>
           </div>
         </div>
+      )}
+      {auditToken && (siteReport || contentAudit) && (
+        <form onSubmit={handleCapture} className="mt-5 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <h3 className="text-sm font-bold text-slate-900">需要团队联系你提供修复建议？</h3>
+          <p className="text-xs text-slate-600">可选：留下邮箱与本次体检结果。提交后不会自动发送邮件，也不会自动订阅营销邮件。</p>
+          {captureMessage ? <p role="status" className="text-sm text-emerald-700">{captureMessage}</p> : <>
+            <label className="block text-xs font-semibold text-slate-700">
+              联系邮箱
+              <input type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="you@company.com" />
+            </label>
+            <label className="flex items-start gap-2 text-xs text-slate-600">
+              <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+              我同意保存我的邮箱和本次体检结果，并由团队就修复建议联系我。
+            </label>
+            <button type="submit" disabled={!consent || captureBusy || loading} className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+              {captureBusy ? "正在保存…" : "请求联系"}
+            </button>
+          </>}
+          {captureError && <p role="alert" className="text-xs text-rose-700">{captureError}</p>}
+        </form>
       )}
     </div>
   );

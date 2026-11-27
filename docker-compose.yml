@@ -3,12 +3,16 @@ services:
     build: .
     container_name: geopulse-studio
     restart: unless-stopped
+    mem_limit: 768m
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_APP_URL=https://geo.yourdomain.com
-      - SESSION_SECRET=change-this-to-a-64-char-random-secret
+      - SESSION_SECRET=${SESSION_SECRET:?Set a private SESSION_SECRET in .env}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:?Set the private owner ADMIN_EMAIL in .env}
+      - APP_URL=${APP_URL:?Set APP_URL in .env}
       - GEOPULSE_DATA_DIR=/app/data
     volumes:
       - ./data:/app/data

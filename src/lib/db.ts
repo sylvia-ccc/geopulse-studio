@@ -293,6 +293,41 @@ function openDatabase(): SqliteDatabase {
       action_taken TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS autopilot_template_publications (
+      user_id TEXT NOT NULL,
+      template_key TEXT NOT NULL,
+      article_id TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY(user_id, template_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS email_send_attempts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      lead_id TEXT NOT NULL,
+      recipient TEXT NOT NULL,
+      approval_hash TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'reserved',
+      message_id TEXT NOT NULL DEFAULT '',
+      error TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(user_id, lead_id, approval_hash)
+    );
+    CREATE INDEX IF NOT EXISTS email_send_daily ON email_send_attempts(created_at, status);
+    CREATE INDEX IF NOT EXISTS email_send_recipient ON email_send_attempts(recipient, created_at);
+
+    CREATE TABLE IF NOT EXISTS telemetry_events (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      path TEXT NOT NULL DEFAULT '',
+      bot_name TEXT NOT NULL DEFAULT '',
+      user_agent TEXT NOT NULL DEFAULT '',
+      referer TEXT NOT NULL DEFAULT '',
+      meta TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Safe forward migrations for existing production SQLite databases
@@ -312,6 +347,16 @@ function openDatabase(): SqliteDatabase {
   ensureColumn("citation_checks", "has_hallucination", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("citation_checks", "funnel_stage", "TEXT NOT NULL DEFAULT 'comparison'");
   ensureColumn("platform_accounts", "region", "TEXT NOT NULL DEFAULT 'Global'");
+  ensureColumn("outreach_leads", "source", "TEXT NOT NULL DEFAULT 'manual'");
+  ensureColumn("outreach_leads", "priority_tier", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn("outreach_leads", "click_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("outreach_leads", "last_clicked_at", "TEXT");
+  ensureColumn("outreach_leads", "followup_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("outreach_leads", "consent_status", "TEXT NOT NULL DEFAULT 'unknown'");
+  ensureColumn("outreach_leads", "consent_evidence", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn("outreach_leads", "approved_at", "TEXT");
+  ensureColumn("outreach_leads", "approval_hash", "TEXT NOT NULL DEFAULT ''");
+  db.exec("CREATE INDEX IF NOT EXISTS telemetry_created ON telemetry_events(created_at); CREATE INDEX IF NOT EXISTS telemetry_type_created ON telemetry_events(event_type, created_at)");
 
   globalForDb.__geopulseDb = db;
   if (!globalForDb.__geopulseSeeded) {
@@ -329,16 +374,9 @@ function openDatabase(): SqliteDatabase {
      WHERE delivery_mode = 'managed_review' AND region = 'Global'`
   ).run();
 
-  // Ensure demo account and configured ADMIN_EMAIL always hold admin role
-  db.prepare("UPDATE users SET role = 'admin' WHERE email = 'demo@geopulse.ai'").run();
-  db.prepare(
-    "UPDATE users SET credits_balance = 200 WHERE email = 'demo@geopulse.ai' AND credits_balance <= 20"
-  ).run();
-  if (process.env.ADMIN_EMAIL) {
-    db.prepare("UPDATE users SET role = 'admin' WHERE email = ?").run(
-      process.env.ADMIN_EMAIL.toLowerCase().trim()
-    );
-  }
+  // A public sample identity must never inherit administrative privileges.
+  // Owner provisioning is an explicit operator action, never a startup side effect.
+  db.prepare("UPDATE users SET role = 'user' WHERE email = 'demo@geopulse.ai' OR id = 'usr_demo_geopulse'").run();
 
   return db;
 }
@@ -551,9 +589,8 @@ export function createUser(params: {
   const apiKey = generateApiKey();
   const plan = params.plan || "free";
 
-  const isAdminEmail =
-    process.env.ADMIN_EMAIL && email === process.env.ADMIN_EMAIL.toLowerCase().trim();
-  const role: UserRole = isAdminEmail ? "admin" : "user";
+  // Public account creation always starts unprivileged, including ADMIN_EMAIL.
+  const role: UserRole = "user";
 
   getDb()
     .prepare(
@@ -563,6 +600,69 @@ export function createUser(params: {
     .run(id, email, passwordHash, params.name.trim(), params.company?.trim() || "", role, plan, apiKey, now);
 
   return findUserById(id)!;
+}
+
+/**
+ * Explicit local operator provisioning service. Never call from a public route.
+ * Existing accounts are rejected so this cannot silently reset or take over an owner.
+ */
+export function provisionConfiguredOwner(params: {
+  email: string;
+  password: string;
+  name: string;
+  migrateDemoWorkspace: boolean;
+}): { user: UserWithSecret; transferred: Record<string, number> } {
+  const email = params.email.trim().toLowerCase();
+  const configured = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (!configured || configured === "demo@geopulse.ai" || email !== configured) {
+    throw new Error("Owner email must match a non-demo ADMIN_EMAIL");
+  }
+  if (params.password.length < 20) throw new Error("Owner password must contain at least 20 characters");
+  const db = getDb();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    if (findUserByEmail(email)) {
+      throw new Error("Owner email already exists; use existing login or review account recovery before provisioning");
+    }
+    const created = createUser({ email, password: params.password, name: params.name, plan: "free" });
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(created.id);
+    const transferred: Record<string, number> = {};
+    if (params.migrateDemoWorkspace) {
+      const demo = findUserByEmail("demo@geopulse.ai");
+      if (demo) {
+        // Preserve ids, slugs, encryption and publication history. Global platform
+        // accounts and site settings remain global and become accessible to the owner.
+        for (const table of [
+          "brands", "articles", "publish_channels", "publish_logs", "citation_checks",
+          "distribution_orders", "credit_transactions", "growth_topics", "outreach_leads",
+          "email_send_attempts", "autopilot_template_publications",
+        ]) {
+          transferred[table] = db.prepare(`UPDATE ${table} SET user_id = ? WHERE user_id = ?`)
+            .run(created.id, demo.id).changes;
+        }
+        transferred.redemption_codes = db.prepare(
+          "UPDATE redemption_codes SET redeemed_by_user_id = ?, redeemed_by_email = ? WHERE redeemed_by_user_id = ?"
+        ).run(created.id, email, demo.id).changes;
+        db.prepare(`UPDATE users SET company = ?, plan = ?, plan_expires_at = ?, credits_balance = ?,
+          llm_provider = (SELECT llm_provider FROM users WHERE id = ?),
+          llm_base_url = (SELECT llm_base_url FROM users WHERE id = ?),
+          llm_api_key = (SELECT llm_api_key FROM users WHERE id = ?),
+          llm_model = (SELECT llm_model FROM users WHERE id = ?) WHERE id = ?`)
+          .run(demo.company, demo.plan, demo.planExpiresAt, demo.creditsBalance,
+            demo.id, demo.id, demo.id, demo.id, created.id);
+        db.prepare(`UPDATE users SET role = 'user', api_key = ?, password_hash = ?,
+          llm_provider = 'none', llm_base_url = '', llm_api_key = '', llm_model = '',
+          credits_balance = 0, plan = 'free', plan_expires_at = NULL WHERE id = ?`)
+          .run(generateApiKey(), hashPassword(crypto.randomBytes(32).toString("base64url")), demo.id);
+      }
+    }
+    const user = findUserById(created.id)!;
+    db.exec("COMMIT");
+    return { user, transferred };
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export function updateUserSettings(
@@ -1444,7 +1544,7 @@ function seedDemoDataIfEmpty(db: SqliteDatabase) {
   const demoUserId = "usr_demo_geopulse";
   db.prepare(
     `INSERT INTO users (id, email, password_hash, name, company, role, plan, api_key, created_at)
-     VALUES (?, ?, ?, ?, ?, 'admin', ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, 'user', ?, ?, ?)`
   ).run(
     demoUserId,
     "demo@geopulse.ai",

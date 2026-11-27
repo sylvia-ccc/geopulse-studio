@@ -1,50 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { markEmailUnsubscribed, verifyUnsubscribeToken } from "@/lib/outreach";
-
-function htmlPage(title: string, message: string, ok: boolean) {
-  return new NextResponse(
-    `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>${title}</title>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; background: #f8fafc; color: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-  .card { max-width: 460px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px; text-align: center; box-shadow: 0 8px 24px rgba(15,23,42,.06); }
-  .badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 700; background: ${ok ? "#ecfdf5" : "#fef2f2"}; color: ${ok ? "#047857" : "#b91c1c"}; }
-  h1 { margin: 14px 0 8px; font-size: 20px; }
-  p { margin: 0; font-size: 14px; color: #475569; line-height: 1.6; }
-</style>
-</head>
-<body>
-  <div class="card">
-    <span class="badge">${ok ? "Unsubscribed" : "Invalid Link"}</span>
-    <h1>${title}</h1>
-    <p>${message}</p>
-  </div>
-</body>
-</html>`,
-    { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8" } }
-  );
+function page(message:string, content:string,status=200) {
+  return new NextResponse(`<!doctype html><html lang="en"><head><meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email preferences</title></head><body style="font:16px Arial;max-width:560px;margin:80px auto;padding:24px"><h1>${message}</h1>${content}</body></html>`,{status,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
 }
-
-export async function GET(req: NextRequest) {
-  const email = (req.nextUrl.searchParams.get("email") || "").trim().toLowerCase();
-  const token = (req.nextUrl.searchParams.get("token") || "").trim();
-
-  if (!email || !verifyUnsubscribeToken(email, token)) {
-    return htmlPage(
-      "Invalid Unsubscribe Link",
-      "The unsubscribe token is missing or invalid. Please check the link from your email.",
-      false
-    );
-  }
-
+function valid(req:NextRequest) {
+  const email=(req.nextUrl.searchParams.get("email")||"").trim().toLowerCase();
+  const token=req.nextUrl.searchParams.get("token")||"";
+  return email && verifyUnsubscribeToken(email,token) ? email : null;
+}
+// GET renders a confirmation so link preview scanners cannot unsubscribe a recipient.
+export async function GET(req:NextRequest) {
+  if(!valid(req)) return page("Invalid unsubscribe link","<p>Please use the link in your email.</p>",400);
+  return page("Email preferences",'<p>Stop receiving GeoPulse marketing and audit follow-ups.</p><form method="post"><button type="submit">Confirm unsubscribe</button></form>');
+}
+export async function POST(req:NextRequest) {
+  const email=valid(req);
+  if(!email) return page("Invalid unsubscribe link","<p>Please use the link in your email.</p>",400);
   markEmailUnsubscribed(email);
-  return htmlPage(
-    "You have been unsubscribed",
-    `${email} has been permanently added to our opt-out list and will no longer receive AI visibility audit emails from this platform.`,
-    true
-  );
+  return page("Unsubscribed","<p>Your address has been suppressed from future outreach.</p>");
 }

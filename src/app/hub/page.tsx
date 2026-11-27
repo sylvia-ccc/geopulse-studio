@@ -1,9 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Bot, Building2, FileText, Sparkles } from "lucide-react";
 import { listAllPublicBrands, listPublishedArticles } from "@/lib/db";
 import { AI_ENGINES } from "@/lib/geo/weights";
 
 export const dynamic = "force-dynamic";
+const title = "公开 GEO 文章与品牌目录";
+const description = "浏览公开发布的品牌资料、结构化文章与 FAQ，并通过 LLM 文本索引阅读公开内容。";
+export const metadata: Metadata = {
+  title, description,
+  alternates: { canonical: "/hub" },
+  openGraph: {
+    type: "website", url: "/hub", title, description,
+    images: [{ url: "/api/og?title=Public%20GEO%20Article%20Hub", width: 1200, height: 630, alt: title }],
+  },
+  twitter: { card: "summary_large_image", title, description, images: ["/api/og?title=Public%20GEO%20Article%20Hub"] },
+};
 
 export default function PublicHubPage() {
   const brands = listAllPublicBrands();

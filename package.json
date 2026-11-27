@@ -1,15 +1,17 @@
 {
   "name": "geopulse-studio",
-  "version": "1.0.0",
+  "version": "5.1.0",
   "private": true,
   "description": "GeoPulse Studio - Commercial Generative Engine Optimization (GEO) Publishing System",
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "next build && npm run build:owner",
     "start": "next start -p 3000",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:owner": "esbuild scripts/bootstrap-owner.ts --bundle --platform=node --format=cjs --packages=external --outfile=.next/owner-bootstrap.cjs",
+    "owner:bootstrap": "node .next/owner-bootstrap.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.511.0",
@@ -23,6 +25,7 @@
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.1.7",
     "typescript": "^5.8.3",
     "vitest": "^3.1.4"

@@ -1,13 +1,17 @@
 import type { ArticleArchetype, GrowthTopic } from "@/types/geo";
 import {
   createArticle,
+  createBrand,
+  listBrandsByUser,
   createPublishLog,
   findUserByEmail,
   getBrandById,
+  getArticleById,
   getDb,
   newId,
 } from "./db";
 import { buildGeoJsonLd } from "./geo/schema";
+import { buildVerifiedAutopilotContent } from "./autopilot-content";
 
 function makeCleanSlug(title: string): string {
   const ascii = title
@@ -22,11 +26,9 @@ function makeCleanSlug(title: string): string {
 }
 import { auditGeoContent } from "./geo/scorer";
 import { blendEngineWeights } from "./geo/weights";
-import { generateBuiltinArticle } from "./geo/generator";
 import {
   getPlatformAccountWithSecret,
   listPlatformAccounts,
-  seedOfficialGeoGrowthPack,
   submitGlobalBlastOrder,
   type PlatformAccountWithSecret,
 } from "./marketplace";
@@ -108,7 +110,7 @@ export function addGrowthTopic(params: {
 }
 
 export function deleteGrowthTopic(id: string): boolean {
-  const res = getDb().prepare("DELETE FROM growth_topics WHERE id = ?").run(id);
+  const res = getDb().prepare("DELETE FROM growth_topics WHERE id = ? AND status != 'processing'").run(id);
   return res.changes > 0;
 }
 
@@ -119,19 +121,19 @@ const OFFICIAL_AUTOPILOT_TOPICS: Array<{
   archetype: ArticleArchetype;
 }> = [
   {
-    titleHint: "How SEO Agencies Sell White-Label GEO Retainers ($2k-$10k/mo) Using Open-Source Tools in 2026",
+    titleHint: "How to Evaluate a White-Label GEO Workflow for Agency Clients",
     keyword: "white label GEO agency software 2026 open source AI SEO retainers",
     language: "en",
     archetype: "howto_playbook",
   },
   {
-    titleHint: "Best Free Website AI Crawler Audit Tools in 2026: Test GPTBot, PerplexityBot & ClaudeBot",
+    titleHint: "How to Verify AI Crawler Access: GPTBot, PerplexityBot & ClaudeBot",
     keyword: "free AI crawler audit tool GPTBot PerplexityBot llms.txt checker 2026",
     language: "en",
     archetype: "comparison_matrix",
   },
   {
-    titleHint: "How to Get Your B2B SaaS Recommended by Perplexity & ChatGPT Search in 14 Days",
+    titleHint: "How to Measure B2B SaaS Mentions in AI Search Results",
     keyword: "get B2B SaaS cited by ChatGPT Search Perplexity GEO guide 2026",
     language: "en",
     archetype: "howto_playbook",
@@ -149,7 +151,7 @@ const OFFICIAL_AUTOPILOT_TOPICS: Array<{
     archetype: "category_guide",
   },
   {
-    titleHint: "2026 代运营机构如何用开源白标 GEO 平台交付月费 ¥15,000 客户方案？",
+    titleHint: "代运营机构如何核验白标 GEO 客户报告的证据？",
     keyword: "白标 GEO 代运营 开源平台 客户报告 DeepSeek 豆包",
     language: "zh",
     archetype: "howto_playbook",
@@ -160,81 +162,91 @@ export function seedOfficialAutopilotQueue(adminUserId: string, baseUrl: string)
   addedCount: number;
   topics: GrowthTopic[];
 } {
-  const pack = seedOfficialGeoGrowthPack(adminUserId, baseUrl);
-  const existing = listGrowthTopics(adminUserId);
-  const existingTitles = new Set(existing.map((t) => t.titleHint.toLowerCase()));
-  let addedCount = 0;
-
-  for (const spec of OFFICIAL_AUTOPILOT_TOPICS) {
-    if (existingTitles.has(spec.titleHint.toLowerCase())) continue;
-    addGrowthTopic({
-      userId: adminUserId,
-      brandId: pack.brandId,
-      titleHint: spec.titleHint,
-      keyword: spec.keyword,
-      language: spec.language,
-      archetype: spec.archetype,
-      targetAccountIds: [],
-    });
-    addedCount += 1;
+  const db = getDb();
+  // Queue seeding must never call the legacy published marketing-article pack.
+  db.exec("SAVEPOINT autopilot_seed");
+  try {
+    const brand = listBrandsByUser(adminUserId).find((item) => item.name === "GeoPulse Studio") ||
+      createBrand(adminUserId, {
+        name: "GeoPulse Studio", companyName: "GeoPulse Open-Source Project",
+        productName: "GeoPulse Studio", category: "Content editing and API publishing",
+        oneLiner: "An MIT-licensed workspace for content editing and configured API publishing.",
+        targetAudience: "Content teams and agencies", coreAdvantages: [], proofPoints: [],
+        pricingInfo: "Review configured checkout and service terms before quoting prices.",
+        competitors: [], websiteUrl: baseUrl.replace(/\/$/, ""), forbiddenWords: [], regionFocus: "Both",
+      });
+    const existingTitles = new Set(db.prepare(
+      "SELECT title_hint FROM growth_topics WHERE user_id = ?"
+    ).all(adminUserId).map((row) => String(row.title_hint).toLowerCase()));
+    let addedCount = 0;
+    for (const spec of OFFICIAL_AUTOPILOT_TOPICS) {
+      if (existingTitles.has(spec.titleHint.toLowerCase())) continue;
+      addGrowthTopic({ userId: adminUserId, brandId: brand.id, ...spec, targetAccountIds: [] });
+      addedCount += 1;
+    }
+    const topics = listGrowthTopics(adminUserId);
+    db.exec("RELEASE SAVEPOINT autopilot_seed");
+    return { addedCount, topics };
+  } catch (error) {
+    db.exec("ROLLBACK TO SAVEPOINT autopilot_seed");
+    db.exec("RELEASE SAVEPOINT autopilot_seed");
+    throw error;
   }
-
-  return { addedCount, topics: listGrowthTopics(adminUserId) };
 }
 
-function buildEnglishAutopilotArticle(params: {
-  title: string;
-  keyword: string;
-  brandName: string;
-  baseUrl: string;
-}) {
-  const cleanBase = params.baseUrl.replace(/\/$/, "");
-  const capsule = `In 2026, ${params.title} comes down to four verifiable pillars: explicit AI crawler access (GPTBot, PerplexityBot, ClaudeBot), structured /llms.txt + 4-in-1 JSON-LD, objective comparison tables, and canonical multi-platform syndication. ${params.brandName} (${cleanBase}) automates all four as a MIT open-source commercial platform starting at $0/mo.`;
+// Removing this marker is an explicit editorial acknowledgement, separate from
+// the mechanical GEO score. Scores do not establish factual accuracy or citations.
+export const AUTOPILOT_REVIEW_MARKER = "<!-- autopilot-review-required -->";
 
-  const markdown = `> **Direct Takeaway (2026)**: Winning recommendations in ChatGPT Search, Perplexity, Google AI Overviews, and DeepSeek requires structured factual proof rather than marketing fluff. Audit any domain free in 3 seconds with **${params.brandName}** at [${cleanBase}/audit](${cleanBase}/audit).
+function buildEditorialDraft(topic: GrowthTopic, brandName: string) {
+  const zh = topic.language === "zh";
+  const capsule = zh
+    ? `选题：${topic.titleHint}。本文为待核验编辑草稿，涉及 ${brandName} 与 ${topic.keyword} 的结论需由编辑补充证据。`
+    : `Research topic: ${topic.titleHint}. This editorial draft needs verified evidence before drawing conclusions about ${brandName} and ${topic.keyword}.`;
+  const markdown = zh
+    ? `${AUTOPILOT_REVIEW_MARKER}
 
-## 1. 2026 Execution Benchmark: Passive Dashboards vs Full-Stack GEO
+> 编辑审核：请完成以下核验、替换占位内容并移除此审核标记，再通过编辑器发布。
 
-| Capability | ${params.brandName} 5.0 | Legacy Monitoring Dashboards | Manual SEO Workflow |
-| :--- | :--- | :--- | :--- |
-| **Monthly Cost (2026)** | **\$0 MIT Self-Host / \$39–\$149 Cloud** | \$99–\$1,500+/mo | \$2,000+ agency labor |
-| **Live AI Crawler Audit** | ✅ Instant 6-bot + /llms.txt check | ⚠️ Paid tier only | ❌ Manual curl |
-| **White-Label Client Reports** | ✅ Shareable /r/ links + Print PDF | ⚠️ Enterprise tier | ❌ Manual slides |
-| **Official-API Global Syndication** | ✅ 1-Click Blast (DEV.to, Bluesky, GitHub Pages, Telegraph) | ❌ Not included | ❌ Manual copy-paste |
+## 研究问题
+${topic.titleHint}
 
-## 2. Step-by-Step 2026 Playbook
+目标关键词：${topic.keyword}
 
-1. **Audit technical crawlability first**: Run [${cleanBase}/audit](${cleanBase}/audit) to verify \`robots.txt\`, \`/llms.txt\`, SSR text ratio, and Schema.org JSON-LD (benchmark target: **85+/100**).
-2. **Publish citation-ready entity matrices**: Anchor your brand name, pricing, and "best fit / not suitable for" scope clearly in the first 150 words so LLMs extract accurate facts without hallucinating.
-3. **Syndicate via official APIs with canonical URLs**: Use **${params.brandName}** to publish once to \`/p/[slug]\` and blast automatically to high-authority domains (DA 85–96) within 5 seconds.
-4. **Deliver shareable white-label proof**: Share live client reports and Markdown syndication proof links to justify recurring \$2,000–\$10,000/month retainers.
+## 可核验事实与来源
+- 补充原始来源 URL、观察日期、测试方法及适用范围。
+- 定价、竞品能力、客户成果与平台规则必须逐项核验，不得凭空填写。
 
-## 3. Scope & Objective Limitations (Best Fit vs Not Suitable)
+## 方法与观察
+补充本选题独有的实测步骤、样本及结果，避免重复的推广模板。
 
-- **Best fit for**: B2B SaaS founders, indie developers, and boutique SEO/GEO agencies seeking fast, verifiable AI search visibility and white-label client reporting in 2026.
-- **Not suitable for**: Black-hat spam networks or sites without transparent product positioning and pricing facts.
-- **Source & Free Tools**: Open-source repository at [github.com/sylvia-ccc/geopulse-studio](https://github.com/sylvia-ccc/geopulse-studio) · Free Audit at [${cleanBase}/audit](${cleanBase}/audit).`;
+## 局限与适用范围
+技术可抓取性与内容评分不代表收录、排名或 AI 引用保证。
 
-  const faqs = [
-    {
-      question: `How does ${params.brandName} help with "${params.keyword}" in 2026?`,
-      answer: `${params.brandName} combines a free 3-second AI crawler audit, an 8-dimension bilingual GEO scorer, native SSR /llms.txt + JSON-LD hosting, white-label shareable client reports, and 1-click official-API global syndication.`,
-    },
-    {
-      question: "Does syndicating GEO articles with canonical_url hurt Google SEO?",
-      answer: "No. Passing the official canonical_url field on DEV.to, GitHub Pages, and Ghost attributes primary authority back to your domain while creating high-DA cross-domain corroboration for ChatGPT Search and Perplexity.",
-    },
-    {
-      question: "Can SEO agencies white-label GeoPulse Studio for client retainers?",
-      answer: "Yes. GeoPulse Studio 5.0 supports custom agency branding, shareable zero-login client report URLs (/r/[id]), and built-in Audit-to-Outreach lead workflows under the MIT license or commercial white-label setup.",
-    },
-    {
-      question: "How fast can a site verify its GPTBot and PerplexityBot readiness?",
-      answer: `In under 3 seconds with zero login required at ${cleanBase}/audit, including copy-paste robots.txt and /llms.txt remediation templates.`,
-    },
-  ];
+## 编辑发布检查
+核对事实与来源；检查原创性、授权及目标渠道规则；确认本篇有独立价值。`
+    : `${AUTOPILOT_REVIEW_MARKER}
 
-  return { capsule, markdown, faqs };
+> Editorial review: verify the evidence, replace the research prompts, and remove this marker before publishing through the editor.
+
+## Research question
+${topic.titleHint}
+
+Target keyword: ${topic.keyword}
+
+## Facts and primary sources
+- Add primary-source URLs, observation dates, test methods, and scope.
+- Verify pricing, competitor capabilities, customer outcomes, and platform rules individually.
+
+## Method and observations
+Add topic-specific steps, samples, and findings. Replace repeated promotional copy with original evidence.
+
+## Limitations and applicability
+Crawler access and content scores do not guarantee indexing, rankings, or AI citations.
+
+## Editorial publication check
+Verify facts and sources, originality, permissions, channel rules, and the independent value of this article.`;
+  return { capsule, markdown, faqs: [] as Array<{ question: string; answer: string }> };
 }
 
 export async function runNextAutopilotJob(params: {
@@ -254,189 +266,193 @@ export async function runNextAutopilotJob(params: {
   | { ok: false; error: string }
 > {
   const db = getDb();
-  const targetUserId =
-    params.userId ||
-    findUserByEmail(process.env.ADMIN_EMAIL || "demo@geopulse.ai")?.id ||
-    findUserByEmail("demo@geopulse.ai")?.id;
+  const configuredOwner = process.env.ADMIN_EMAIL?.trim()
+    ? findUserByEmail(process.env.ADMIN_EMAIL.trim()) : null;
+  const targetUserId = params.userId || (
+    configuredOwner?.role === "admin" && configuredOwner.email !== "demo@geopulse.ai"
+      ? configuredOwner.id : undefined
+  );
   if (!targetUserId) {
     return { ok: false, error: "未找到管理员账号以执行 Autopilot" };
   }
 
-  const nextRow = db
-    .prepare(
-      "SELECT * FROM growth_topics WHERE user_id = ? AND status = 'queued' ORDER BY created_at ASC LIMIT 1"
-    )
-    .get(targetUserId);
+  // Claim in one SQLite write. A concurrent worker cannot select the same topic.
+  // Reviewed drafts are eligible only after an editor removes the review marker
+  // and explicitly publishes the existing article through the normal editor.
+  const nextRow = db.prepare(`
+    UPDATE growth_topics SET status = 'processing', error_msg = ''
+    WHERE id = (
+      SELECT t.id FROM growth_topics t
+      WHERE t.user_id = ? AND (
+        t.status = 'queued' OR (
+          t.status = 'review_pending' AND EXISTS (
+            SELECT 1 FROM articles a WHERE a.id = t.article_id
+              AND a.user_id = t.user_id AND a.brand_id = t.brand_id
+              AND a.status = 'published' AND instr(a.markdown_content, ?) = 0
+          )
+        )
+      )
+      ORDER BY CASE WHEN t.status = 'review_pending' THEN 0 ELSE 1 END,
+        t.created_at ASC, t.id ASC LIMIT 1
+    ) AND status IN ('queued', 'review_pending')
+    RETURNING *
+  `).get(targetUserId, AUTOPILOT_REVIEW_MARKER);
 
   if (!nextRow) {
-    return { ok: true, ran: false, message: "自动增长队列当前没有待执行选题（已全部完成）" };
+    return { ok: true, ran: false, message: "没有可执行选题；待审核草稿须经编辑核验后发布" };
   }
 
   const topic = mapTopic(nextRow);
-  const brand = getBrandById(topic.brandId);
-  if (!brand) {
-    db.prepare("UPDATE growth_topics SET status='failed', error_msg=?, executed_at=? WHERE id=?").run(
-      "关联品牌不存在",
-      new Date().toISOString(),
-      topic.id
-    );
-    return { ok: false, error: "关联品牌档案不存在" };
-  }
+  let articleId = topic.articleId;
+  const publishedUrls: string[] = [...topic.publishedUrls];
+  const customerNote = `GEO Autopilot scheduled syndication (${topic.id})`;
+  try {
+    const brand = getBrandById(topic.brandId);
+    if (!brand || brand.userId !== targetUserId) throw new Error("关联品牌不存在或无权访问");
+    const cleanBase = params.baseUrl.replace(/\/$/, "");
+    let article = articleId ? getArticleById(articleId) : null;
 
-  const cleanBase = params.baseUrl.replace(/\/$/, "");
-  const engines = ["doubao", "deepseek", "chatgpt", "perplexity", "gemini"] as const;
-  const weights = blendEngineWeights([...engines]);
-  const now = new Date().toISOString();
-
-  let title = topic.titleHint;
-  let capsule = "";
-  let markdown = "";
-  let faqs: Array<{ question: string; answer: string }> = [];
-
-  if (topic.language === "en") {
-    const en = buildEnglishAutopilotArticle({
-      title: topic.titleHint,
-      keyword: topic.keyword,
-      brandName: brand.name,
-      baseUrl: cleanBase,
-    });
-    capsule = en.capsule;
-    markdown = en.markdown;
-    faqs = en.faqs;
-  } else {
-    const gen = generateBuiltinArticle({
-      brand,
-      archetype: topic.archetype,
-      targetEngines: [...engines],
-      weights,
-      targetChannel: "geo_hub",
-      customAngle: topic.keyword,
-      baseUrl: cleanBase,
-    });
-    title = topic.titleHint || gen.title;
-    capsule = gen.directAnswerCapsule;
-    markdown = gen.markdownContent;
-    faqs = gen.faqs;
-  }
-
-  const baseSlug = makeCleanSlug(title);
-  const slug = db.prepare("SELECT id FROM articles WHERE slug = ?").get(baseSlug)
-    ? `${baseSlug}-${Date.now().toString(36).slice(-4)}`
-    : baseSlug;
-
-  const summary = capsule.slice(0, 175);
-  const jsonLd = buildGeoJsonLd({
-    title,
-    slug,
-    summary,
-    directAnswerCapsule: capsule,
-    targetKeyword: topic.keyword,
-    faqs,
-    publishedAt: now,
-    brand,
-    baseUrl: cleanBase,
-  });
-
-  const audit = auditGeoContent({
-    title,
-    slug,
-    summary,
-    targetKeyword: topic.keyword,
-    directAnswerCapsule: capsule,
-    markdownContent: markdown,
-    faqs,
-    jsonLd,
-    brand,
-    weights,
-  });
-
-  const article = createArticle(targetUserId, {
-    brandId: brand.id,
-    title,
-    slug,
-    summary,
-    archetype: topic.archetype,
-    targetEngines: [...engines],
-    customWeights: weights,
-    targetChannel: "geo_hub",
-    targetKeyword: topic.keyword,
-    directAnswerCapsule: capsule,
-    markdownContent: markdown,
-    faqs,
-    comparisonTable: null,
-    jsonLd,
-    geoScore: audit.overallScore,
-    engineScores: audit.engineScores,
-    dimensionScores: audit.dimensionScores,
-    status: "published",
-    generationMode: "builtin",
-    publishedAt: now,
-  });
-
-  const primaryUrl = `${cleanBase}/p/${article.slug}`;
-  createPublishLog(targetUserId, {
-    articleId: article.id,
-    channelType: "geo_hub",
-    channelName: "GEO Autopilot 自动增长引擎",
-    status: "success",
-    httpStatus: 200,
-    externalUrl: primaryUrl,
-    message: "GEO Autopilot 自动生成并上线至 SSR 专栏与 /llms.txt",
-  });
-
-  const publishedUrls: string[] = [primaryUrl];
-
-  if (!params.skipExternalBlast) {
-    // Select enabled auto_api accounts excluding geo_network (already published above) and qiita (strict new-account rate limits) unless explicitly selected
-    const allEnabledAuto = listPlatformAccounts(false).filter((a) => a.deliveryMode === "auto_api");
-    const targetIds =
-      topic.targetAccountIds.length > 0
-        ? topic.targetAccountIds
-        : allEnabledAuto
-            .filter((a) => a.platformType !== "geo_network" && a.platformType !== "qiita")
-            .map((a) => a.id);
-
-    const accounts: PlatformAccountWithSecret[] = [];
-    for (const id of targetIds) {
-      const full = getPlatformAccountWithSecret(id);
-      if (full && full.enabled && full.deliveryMode === "auto_api") {
-        accounts.push(full);
+    if (!articleId) {
+      const verified = buildVerifiedAutopilotContent(topic, cleanBase);
+      const engines = ["doubao", "deepseek", "chatgpt", "perplexity", "gemini"] as const;
+      const weights = blendEngineWeights([...engines]);
+      const draft = verified || buildEditorialDraft(topic, brand.name);
+      const { capsule, faqs } = draft;
+      const markdown = verified ? `<!-- autopilot-template:${verified.key} -->\n${verified.markdown}` : draft.markdown;
+      const title = verified?.title || topic.titleHint;
+      const slug = `${makeCleanSlug(title)}-${brand.id.slice(-6)}`;
+      const summary = capsule.slice(0, 175);
+      const jsonLd = buildGeoJsonLd({
+        title, slug, summary, directAnswerCapsule: capsule,
+        targetKeyword: topic.keyword, faqs, publishedAt: new Date().toISOString(),
+        brand, baseUrl: cleanBase,
+      });
+      const audit = auditGeoContent({
+        title, slug, summary, targetKeyword: topic.keyword,
+        directAnswerCapsule: capsule, markdownContent: markdown, faqs, jsonLd, brand, weights,
+      });
+      db.exec("SAVEPOINT autopilot_draft");
+      try {
+        if (verified) {
+          // First write obtains the SQLite writer lock before article creation.
+          // The unique key survives topic deletion and prevents repeated template publication.
+          const reservation = db.prepare("INSERT OR IGNORE INTO autopilot_template_publications(user_id,template_key,article_id) VALUES(?,?,'')").run(targetUserId, verified.key);
+          if (!reservation.changes) {
+            const prior = db.prepare("SELECT article_id FROM autopilot_template_publications WHERE user_id=? AND template_key=?").get(targetUserId,verified.key);
+            const existing = prior ? getArticleById(String(prior.article_id)) : null;
+            if (!existing) throw new Error("该教程的历史发布记录需要核查；未重复创建内容");
+            const urls = existing.status === "published" ? [`${cleanBase}/p/${existing.slug}`] : [];
+            db.prepare("UPDATE growth_topics SET status=?, article_id=?, published_urls_json=?, error_msg=?, executed_at=? WHERE id=?").run(existing.status === "published" ? "published" : "review_pending",existing.id,JSON.stringify(urls),"已复用同主题教程；本次未重复发布或外部分发",new Date().toISOString(),topic.id);
+            db.exec("RELEASE SAVEPOINT autopilot_draft");
+            return {ok:true,ran:true,topic:mapTopic(db.prepare("SELECT * FROM growth_topics WHERE id=?").get(topic.id)!),articleSlug:existing.slug,publishedUrls:urls,message:"该主题已有教程，已复用现有内容；本次未重复发文或推送渠道"};
+          }
+        }
+        article = createArticle(targetUserId, {
+          brandId: brand.id, title, slug, summary,
+          archetype: topic.archetype, targetEngines: [...engines], customWeights: weights,
+          targetChannel: "geo_hub", targetKeyword: topic.keyword,
+          directAnswerCapsule: capsule, markdownContent: markdown, faqs,
+          comparisonTable: null, jsonLd, geoScore: audit.overallScore,
+          engineScores: audit.engineScores, dimensionScores: audit.dimensionScores,
+          status: verified ? "published" : "draft", generationMode: "builtin",
+          publishedAt: verified ? new Date().toISOString() : null,
+        });
+        articleId = article.id;
+        if (verified) db.prepare("UPDATE autopilot_template_publications SET article_id=? WHERE user_id=? AND template_key=?").run(article.id,targetUserId,verified.key);
+        db.prepare(`UPDATE growth_topics SET status = ?, article_id = ?,
+          error_msg = ?, executed_at = ? WHERE id = ? AND status = 'processing'`).run(
+          verified ? "processing" : "review_pending", article.id,
+          verified ? "" : "选题超出有来源的教程范围；请补充事实、来源和原创观察后在编辑器发布",
+          new Date().toISOString(), topic.id,
+        );
+        db.exec("RELEASE SAVEPOINT autopilot_draft");
+      } catch (error) {
+        db.exec("ROLLBACK TO SAVEPOINT autopilot_draft");
+        db.exec("RELEASE SAVEPOINT autopilot_draft");
+        articleId = "";
+        throw error;
       }
+      if (!verified) return {
+        ok: true, ran: true,
+        topic: mapTopic(db.prepare("SELECT * FROM growth_topics WHERE id = ?").get(topic.id)!),
+        articleSlug: article!.slug, geoScore: article!.geoScore, publishedUrls: [],
+        message: `已创建《${article!.title}》待核验草稿；选题超出有来源教程范围，尚未发布`,
+      };
     }
 
-    if (accounts.length > 0) {
-      const blast = await submitGlobalBlastOrder({
-        userId: targetUserId,
-        article,
-        accounts,
-        customerNote: `GEO Autopilot scheduled syndication (${topic.id})`,
-        baseUrl: cleanBase,
-      });
-      if (blast.ok) {
-        for (const r of blast.results) {
-          if (r.status === "published" && r.publishedUrl) {
-            publishedUrls.push(r.publishedUrl);
-          }
+    if (!article || article.userId !== targetUserId || article.brandId !== topic.brandId ||
+        article.status !== "published" || article.markdownContent.includes(AUTOPILOT_REVIEW_MARKER)) {
+      throw new Error("关联文章尚未完成编辑审核并发布");
+    }
+    const primaryUrl = `${cleanBase}/p/${article.slug}`;
+    if (!publishedUrls.includes(primaryUrl)) publishedUrls.push(primaryUrl);
+    // Persist the local publication before any external side effect.
+    db.prepare("UPDATE growth_topics SET published_urls_json = ? WHERE id = ?").run(
+      JSON.stringify(publishedUrls), topic.id,
+    );
+
+    if (!params.skipExternalBlast) {
+      const autoAccounts = listPlatformAccounts(false).filter((a) => a.deliveryMode === "auto_api");
+      const targetIds = topic.targetAccountIds.length > 0 ? [...new Set(topic.targetAccountIds)] :
+        autoAccounts.filter((a) => a.platformType !== "geo_network" && a.platformType !== "qiita").map((a) => a.id);
+      const accounts: PlatformAccountWithSecret[] = [];
+      for (const id of targetIds) {
+        const account = getPlatformAccountWithSecret(id);
+        if (!account || !account.enabled || account.deliveryMode !== "auto_api") {
+          throw new Error(`目标渠道不可用：${id}`);
+        }
+        accounts.push(account);
+      }
+      if (accounts.length > 0) {
+        const blast = await submitGlobalBlastOrder({
+          userId: targetUserId, article, accounts, customerNote, baseUrl: cleanBase,
+        });
+        if (!blast.ok) throw new Error(`外部分发失败：${blast.error}`);
+        const failures: string[] = [];
+        for (const result of blast.results) {
+          if (result.status === "published" && result.publishedUrl) {
+            if (!publishedUrls.includes(result.publishedUrl)) publishedUrls.push(result.publishedUrl);
+          } else failures.push(result.platformName);
+        }
+        if (blast.results.length !== accounts.length || failures.length > 0) {
+          throw new Error(`外部分发未全部完成：${failures.join("、") || "缺少渠道结果"}；请核对渠道订单，勿重复推送已成功入口`);
         }
       }
     }
+
+    createPublishLog(targetUserId, {
+      articleId: article.id, channelType: "geo_hub", channelName: "GEO Autopilot 有来源内容分发",
+      status: "success", httpStatus: 200, externalUrl: primaryUrl,
+      message: "已记录通过来源教程检查或编辑核验的文章及本次分发结果",
+    });
+    db.prepare(`UPDATE growth_topics SET status = 'published', article_id = ?,
+      published_urls_json = ?, error_msg = '', executed_at = ? WHERE id = ? AND status = 'processing'`).run(
+      article.id, JSON.stringify(publishedUrls), new Date().toISOString(), topic.id,
+    );
+    return {
+      ok: true, ran: true,
+      topic: mapTopic(db.prepare("SELECT * FROM growth_topics WHERE id = ?").get(topic.id)!),
+      articleSlug: article.slug, geoScore: article.geoScore, publishedUrls,
+      message: `已完成《${article.title}》本次配置渠道的分发记录，共 ${publishedUrls.length} 个公开入口`,
+    };
+  } catch (error) {
+    // Preserve confirmed external URLs even if a publisher throws after a partial
+    // side effect. Failed topics require manual reconciliation, never auto-retry.
+    if (articleId) {
+      const delivered = db.prepare(`SELECT published_url FROM distribution_orders
+        WHERE user_id = ? AND article_id = ? AND customer_note = ? AND status = 'published'`).all(
+        targetUserId, articleId, customerNote,
+      );
+      for (const row of delivered) {
+        const url = String(row.published_url || "");
+        if (url && !publishedUrls.includes(url)) publishedUrls.push(url);
+      }
+    }
+    const message = error instanceof Error ? error.message : "Autopilot 执行失败";
+    db.prepare(`UPDATE growth_topics SET status = 'failed', article_id = ?,
+      published_urls_json = ?, error_msg = ?, executed_at = ? WHERE id = ?`).run(
+      articleId, JSON.stringify(publishedUrls), message, new Date().toISOString(), topic.id,
+    );
+    return { ok: false, error: message };
   }
-
-  db.prepare(
-    `UPDATE growth_topics
-     SET status = 'published', article_id = ?, published_urls_json = ?, error_msg = '', executed_at = ?
-     WHERE id = ?`
-  ).run(article.id, JSON.stringify(publishedUrls), new Date().toISOString(), topic.id);
-
-  const updatedTopic = mapTopic(db.prepare("SELECT * FROM growth_topics WHERE id = ?").get(topic.id)!);
-
-  return {
-    ok: true,
-    ran: true,
-    topic: updatedTopic,
-    articleSlug: article.slug,
-    geoScore: article.geoScore,
-    publishedUrls,
-    message: `GEO Autopilot 已自动上线《${article.title}》（GEO ${article.geoScore} 分）并同步分发至 ${publishedUrls.length} 个公开入口`,
-  };
 }

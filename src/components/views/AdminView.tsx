@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { TelemetryView } from "./TelemetryView";
 import {
   Ban,
   Check,
@@ -59,7 +60,7 @@ interface Props {
 }
 
 export function AdminView({ onRefreshGlobal, onNotify }: Props) {
-  const [subTab, setSubTab] = useState<"billing" | "accounts" | "orders" | "autopilot">("billing");
+  const [subTab, setSubTab] = useState<"billing" | "accounts" | "orders" | "autopilot" | "telemetry">("billing");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
@@ -408,8 +409,11 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
             <Rocket className="h-3.5 w-3.5" />
             自动增长与白标（{growthTopics.filter((t) => t.status === "queued").length}）
           </button>
+          <button type="button" onClick={() => setSubTab("telemetry")} className={`rounded-lg px-3 py-2 ${subTab === "telemetry" ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>真实访问与爬虫遥测</button>
         </div>
       </div>
+
+      {subTab === "telemetry" && <TelemetryView />}
 
       {/* Platform KPIs + Official Growth Pack CTA */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
@@ -1133,10 +1137,10 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  🚀 GEO 推 GEO 全自动定时增长队列（GEO Autopilot）
+                  🚀 GEO 定时内容增长队列（GEO Autopilot）
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  由服务器 Cron（每周二/五 UTC 10:00）自动从队列取下一篇选题 → 生成 88+ 分文章 → 写入 /llms.txt 并一键联发至全球官方 API。
+                  计划每日 UTC 10:00 由服务器 Cron 尝试处理下一篇选题。符合条件的已核验教程可通过质量门槛后发布；缺少证据的研究或对比选题先生成待审核草稿，补充来源并完成编辑审核后才可分发。评分不保证收录或引用，实际执行以队列状态与发布记录为准。
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1190,14 +1194,14 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {autopilotBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
-                  立即执行下一篇（生文 + 全球联发）
+                  尝试执行下一篇（须通过质量检查）
                 </button>
               </div>
             </div>
 
             {growthTopics.length === 0 ? (
               <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
-                队列为空，点击右上角「装入 6 篇高意向官方选题」即可启动无人值守 GEO 增长飞轮。
+                队列为空。可装入官方选题；定时任务将按计划尝试处理，并受质量检查与审核要求约束。
               </div>
             ) : (
               <div className="mt-4 space-y-2">
@@ -1214,10 +1218,12 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
                               ? "bg-emerald-50 text-emerald-700"
                               : t.status === "failed"
                                 ? "bg-rose-50 text-rose-700"
-                                : "bg-amber-50 text-amber-800"
+                                : t.status === "processing"
+                                  ? "bg-indigo-50 text-indigo-700"
+                                  : "bg-amber-50 text-amber-800"
                           }`}
                         >
-                          {t.status === "published" ? "已自动发布" : t.status === "failed" ? "失败" : "待定时执行"}
+                          {t.status === "published" ? "已完成发布" : t.status === "failed" ? "执行失败，须核查" : t.status === "processing" ? "处理中" : t.status === "review_pending" ? "草稿待人工审核" : "排队等待调度"}
                         </span>
                         <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-700">
                           {t.language}
@@ -1226,16 +1232,25 @@ export function AdminView({ onRefreshGlobal, onNotify }: Props) {
                       </div>
                       <div className="mt-1 text-[11px] text-slate-500">
                         关键词：{t.keyword}
-                        {t.publishedUrls.length > 0 && ` · 已同步 ${t.publishedUrls.length} 个外链`}
+                        {t.publishedUrls.length > 0 && ` · 已记录 ${t.publishedUrls.length} 个确认链接`}
+                        {t.articleId && ` · 文章记录 ${t.articleId}`}
                       </div>
+                      {t.errorMsg && <p className={`mt-2 max-w-3xl text-xs leading-relaxed ${t.status === "failed" ? "text-rose-700" : "text-amber-800"}`}>{t.errorMsg}</p>}
+                      {t.status === "processing" && <p className="mt-1 text-[11px] text-slate-500">处理中任务不可删除；若长时间无结果，请先核查工作进程和分发记录。</p>}
                     </div>
                     <button
                       type="button"
+                      aria-label={`删除选题 ${t.titleHint}`}
+                      disabled={t.status === "processing"}
                       onClick={async () => {
-                        await fetch(`/api/cron/autopilot?id=${encodeURIComponent(t.id)}`, { method: "DELETE" });
-                        await loadData();
+                        try {
+                          const res = await fetch(`/api/cron/autopilot?id=${encodeURIComponent(t.id)}`, { method: "DELETE" });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || "删除失败");
+                          await loadData();
+                        } catch (err) { onNotify(err instanceof Error ? err.message : "删除失败", "error"); }
                       }}
-                      className="self-end rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:self-center"
+                      className="self-end rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 sm:self-center"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

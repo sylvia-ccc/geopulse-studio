@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recordTelemetryEvent } from "@/lib/telemetry";
 import { getBaseUrl } from "@/lib/api-auth";
 import { listAllPublicBrands, listPublishedArticles } from "@/lib/db";
 import { buildLlmsFullTxt } from "@/lib/geo/schema";
@@ -14,6 +15,13 @@ export async function GET(req: NextRequest) {
     baseUrl: getBaseUrl(req),
   });
 
+  recordTelemetryEvent({
+    eventType: "llms_fetch",
+    path: "/llms-full.txt",
+    headers: req.headers,
+    userAgent: req.headers.get("user-agent") || "",
+    referer: req.headers.get("referer") || "",
+  });
   return new NextResponse(content, {
     status: 200,
     headers: {

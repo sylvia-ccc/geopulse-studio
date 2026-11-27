@@ -1,0 +1,46 @@
+# Dependencies and generated output
+node_modules
+.next
+.git
+*.tsbuildinfo
+coverage
+
+# Runtime state, local databases, backups, and logs must never enter image layers
+data
+backups
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+logs
+
+# Secrets and machine-local configuration
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+.npmrc
+.ssh
+.DS_Store
+
+# Editor, tooling, and agent state
+.vscode
+.idea
+.agent
+.agents
+.gemini
+browser_sandbox
+
+# Python helper caches
+**/__pycache__/
+*.pyc

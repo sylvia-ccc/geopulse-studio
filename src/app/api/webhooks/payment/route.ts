@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  normalizeSkuFromName,
+  normalizeVerifiedPaymentPayload,
   processVerifiedPaymentEvent,
   verifyGenericWebhookSecret,
   verifyLemonSqueezySignature,
-  type NormalizedPaymentEvent,
 } from "@/lib/payment-webhooks";
 
 export async function POST(req: NextRequest) {
@@ -17,54 +16,29 @@ export async function POST(req: NextRequest) {
   }
 
   const rawBody = await req.text();
+  if (Buffer.byteLength(rawBody, "utf8") > 131072) {
+    return NextResponse.json({ error: "Webhook payload too large" }, { status: 413 });
+  }
   const lsSig = req.headers.get("x-signature") || "";
   const genericSig = req.headers.get("x-geopulse-webhook-secret") || "";
 
-  let provider: NormalizedPaymentEvent["provider"] | null = null;
-  if (lsSig && verifyLemonSqueezySignature(rawBody, lsSig, secret)) {
-    provider = "lemonsqueezy";
-  } else if (genericSig && verifyGenericWebhookSecret(genericSig, secret)) {
-    provider = "generic";
+  let ingress: "lemonsqueezy" | "generic";
+  // An invalid provider signature must never fall back to a different verifier.
+  if (lsSig) {
+    if (!verifyLemonSqueezySignature(rawBody, lsSig, secret)) {
+      return NextResponse.json({ error: "Webhook 签名校验失败" }, { status: 401 });
+    }
+    ingress = "lemonsqueezy";
+  } else if (verifyGenericWebhookSecret(genericSig, secret)) {
+    ingress = "generic";
   } else {
     return NextResponse.json({ error: "Webhook 签名校验失败" }, { status: 401 });
   }
 
   try {
-    const payload = JSON.parse(rawBody) as Record<string, unknown>;
-    let eventId = "";
-    let buyerEmail = "";
-    let skuRaw = "";
-
-    if (provider === "lemonsqueezy") {
-      const meta = (payload.meta || {}) as Record<string, unknown>;
-      const data = (payload.data || {}) as Record<string, unknown>;
-      const attrs = (data.attributes || {}) as Record<string, unknown>;
-      const firstItem = (attrs.first_order_item || {}) as Record<string, unknown>;
-
-      const eventName = String(meta.event_name || "");
-      if (eventName && !["order_created", "subscription_created", "subscription_payment_success"].includes(eventName)) {
-        return NextResponse.json({ ok: true, ignored: eventName });
-      }
-      eventId = `ls_${String(data.id || Date.now())}_${eventName || "order"}`;
-      buyerEmail = String(attrs.user_email || "");
-      skuRaw = String(firstItem.product_name || firstItem.variant_name || attrs.variant_name || "pro");
-    } else {
-      eventId = String(payload.eventId || payload.id || "");
-      buyerEmail = String(payload.buyerEmail || payload.email || "");
-      skuRaw = String(payload.sku || payload.productName || "pro_monthly");
-      if (payload.provider === "stripe") provider = "stripe";
-    }
-
-    if (!eventId || !buyerEmail) {
-      return NextResponse.json({ error: "缺少 eventId 或 buyerEmail" }, { status: 400 });
-    }
-
-    const result = processVerifiedPaymentEvent({
-      eventId,
-      provider,
-      buyerEmail,
-      sku: normalizeSkuFromName(skuRaw),
-    });
+    const normalized = normalizeVerifiedPaymentPayload(JSON.parse(rawBody), ingress);
+    if ("ignored" in normalized) return NextResponse.json({ ok: true, ignored: normalized.ignored });
+    const result = processVerifiedPaymentEvent(normalized.event);
 
     return NextResponse.json(result);
   } catch (err) {

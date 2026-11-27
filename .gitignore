@@ -8,3 +8,7 @@ backups/
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Python helper caches
+**/__pycache__/
+*.pyc

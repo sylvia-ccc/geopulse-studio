@@ -4,8 +4,25 @@ import type { PlanQuota, PlanTier, UserAccount } from "@/types/geo";
 
 export const SESSION_COOKIE_NAME = "geopulse_session";
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || "geopulse-commercial-dev-secret-change-in-prod-2026";
+const DEVELOPMENT_SESSION_SECRET = "geopulse-commercial-dev-secret-change-in-prod-2026";
+export const DEMO_EMAIL = "demo@geopulse.ai";
+
+export function isDemoUser(user: Pick<UserAccount, "id" | "email">): boolean {
+  return user.id === "usr_demo_geopulse" || user.email.trim().toLowerCase() === DEMO_EMAIL;
+}
+
+export function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  const placeholder = secret && (
+    /replace[-_ ]?with|change[-_ ]?(?:this|me|in[-_ ]?prod)|your[-_ ]?(?:session[-_ ]?)?secret|placeholder|(?:example|sample|default)[-_ ]?(?:session[-_ ]?)?secret|geopulse[-_].*(?:dev|default).*secret/i.test(secret) ||
+    /^([a-z0-9])\1+$/i.test(secret.trim())
+  );
+  if (process.env.NODE_ENV === "production" &&
+      (!secret || secret.trim().length < 32 || secret === DEVELOPMENT_SESSION_SECRET || placeholder)) {
+    throw new Error("Production SESSION_SECRET must be a private random secret of at least 32 characters; defaults and placeholders are invalid");
+  }
+  return secret || DEVELOPMENT_SESSION_SECRET;
+}
 
 export const PLAN_QUOTAS: Record<PlanTier, PlanQuota> = {
   free: {
@@ -50,8 +67,8 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
+  if (!/^[a-f0-9]{32}:[a-f0-9]{128}$/.test(stored)) return false;
   const [salt, originalHex] = stored.split(":");
-  if (!salt || !originalHex) return false;
   const derived = crypto.scryptSync(password, salt, 64);
   const original = Buffer.from(originalHex, "hex");
   if (derived.length !== original.length) return false;
@@ -66,13 +83,15 @@ export function signSessionToken(userId: string): string {
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = `${userId}.${issuedAt}`;
   const sig = crypto
-    .createHmac("sha256", SESSION_SECRET)
+    .createHmac("sha256", getSessionSecret())
     .update(payload)
     .digest("hex");
   return `${payload}.${sig}`;
 }
 
 export function verifySessionToken(token: string): string | null {
+  let secret: string;
+  try { secret = getSessionSecret(); } catch { return null; }
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [userId, issuedAtStr, sig] = parts;
@@ -80,7 +99,7 @@ export function verifySessionToken(token: string): string | null {
 
   const payload = `${userId}.${issuedAtStr}`;
   const expectedSig = crypto
-    .createHmac("sha256", SESSION_SECRET)
+    .createHmac("sha256", secret)
     .update(payload)
     .digest("hex");
 
@@ -91,7 +110,7 @@ export function verifySessionToken(token: string): string | null {
 
   const issuedAt = Number(issuedAtStr);
   const maxAgeSec = 60 * 60 * 24 * 14; // 14 days
-  if (!Number.isFinite(issuedAt) || Date.now() / 1000 - issuedAt > maxAgeSec) {
+  if (!Number.isSafeInteger(issuedAt) || issuedAt > Date.now() / 1000 + 60 || Date.now() / 1000 - issuedAt > maxAgeSec) {
     return null;
   }
   return userId;
@@ -113,22 +132,23 @@ export function hasServerGlobalLlm(): boolean {
 }
 
 export function sanitizeUser(user: UserAccount & { passwordHash?: string }) {
+  const demo = isDemoUser(user);
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     company: user.company,
-    role: user.role,
+    role: demo ? "user" as const : user.role,
     plan: user.plan,
     planExpiresAt: user.planExpiresAt,
     creditsBalance: user.creditsBalance ?? 0,
-    apiKey: user.apiKey,
+    apiKey: demo ? "" : user.apiKey,
     llmProvider: user.llmProvider,
-    llmBaseUrl: user.llmBaseUrl,
-    llmApiKeyMasked: user.llmApiKey
+    llmBaseUrl: demo ? "" : user.llmBaseUrl,
+    llmApiKeyMasked: !demo && user.llmApiKey
       ? `${user.llmApiKey.slice(0, 6)}••••${user.llmApiKey.slice(-4)}`
       : "",
-    hasLlmApiKey: Boolean(user.llmApiKey),
+    hasLlmApiKey: !demo && Boolean(user.llmApiKey),
     serverLlmEnabled: hasServerGlobalLlm(),
     llmModel: user.llmModel,
     createdAt: user.createdAt,

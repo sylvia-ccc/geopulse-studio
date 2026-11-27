@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createUser, findUserByEmail } from "@/lib/db";
-import { sanitizeUser, SESSION_COOKIE_NAME, signSessionToken } from "@/lib/auth";
+import { DEMO_EMAIL, getSessionSecret, sanitizeUser, SESSION_COOKIE_NAME, signSessionToken } from "@/lib/auth";
 
 const registerSchema = z.object({
   email: z.string().email("请输入有效的邮箱地址"),
@@ -20,6 +20,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const email = parsed.data.email.trim().toLowerCase();
+    if (email === DEMO_EMAIL || email === process.env.ADMIN_EMAIL?.trim().toLowerCase()) {
+      return NextResponse.json({ error: "此邮箱不可用于公开注册" }, { status: 403 });
+    }
+    // Validate deployment configuration before creating an account.
+    getSessionSecret();
 
     const existing = findUserByEmail(parsed.data.email);
     if (existing) {

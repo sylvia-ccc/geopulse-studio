@@ -1,7 +1,9 @@
 import crypto from "crypto";
 
+import { getSessionSecret } from "./auth";
+
 function getReportSecret(): string {
-  return process.env.SESSION_SECRET || "geopulse-dev-session-secret-change-in-prod";
+  return getSessionSecret();
 }
 
 export function signWhiteLabelReportToken(brandId: string, ownerUserId: string): string {

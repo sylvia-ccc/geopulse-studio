@@ -9,37 +9,16 @@ function LoginFormInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("demo@geopulse.ai");
-  const [password, setPassword] = useState("Demo123456!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleDemoLogin = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ demo: true }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "演示登录失败");
-      router.push("/app");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "登录失败");
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (searchParams.get("demo") === "1") {
-      void handleDemoLogin();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (searchParams.get("demo") === "1") router.replace("/#free-audit");
+  }, [searchParams, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,15 +61,13 @@ function LoginFormInner() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
           {/* Quick Demo CTA */}
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            disabled={loading}
+          <Link
+            href="/#free-audit"
             className="mb-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-60"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-            一键进入演示工作台（预置 2 个真实品牌与已发布文章）
-          </button>
+            <Zap className="h-4 w-4" />
+            公开体验免费 GEO 诊断
+          </Link>
 
           <div className="relative mb-6 flex items-center justify-center">
             <div className="w-full border-t border-slate-200" />
@@ -208,7 +185,7 @@ function LoginFormInner() {
 
           {mode === "login" && (
             <p className="mt-4 text-center text-xs text-slate-400">
-              演示账号：demo@geopulse.ai / Demo123456!
+              使用个人账号管理品牌、文章与发布渠道
             </p>
           )}
         </div>

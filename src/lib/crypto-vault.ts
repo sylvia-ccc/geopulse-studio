@@ -1,10 +1,9 @@
 import crypto from "node:crypto";
 
-const RAW_SECRET =
-  process.env.SESSION_SECRET || "geopulse-commercial-dev-secret-change-in-prod-2026";
+import { getSessionSecret } from "./auth";
 
 function deriveAesKey(): Buffer {
-  return crypto.createHash("sha256").update(`geopulse-vault::${RAW_SECRET}`).digest();
+  return crypto.createHash("sha256").update(`geopulse-vault::${getSessionSecret()}`).digest();
 }
 
 const PREFIX = "enc:v1:";

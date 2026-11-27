@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getBaseUrl, requireAuthUser, unauthorizedResponse } from "@/lib/api-auth";
 import {
+  approveOutreachLead,
   auditLeadAndGenerateDraft,
   createOutreachLead,
   deleteOutreachLead,
+  draftFollowupForLead,
   listOutreachLeads,
   updateOutreachLead,
 } from "@/lib/outreach";
@@ -38,7 +40,8 @@ export async function POST(req: NextRequest) {
   const user = await requireAuthUser(req);
   if (!user) return unauthorizedResponse();
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({error:"请求参数无效"},{status:400});
 
   if (typeof body.bulkText === "string") {
     const parsed = bulkSchema.safeParse(body);
@@ -97,9 +100,15 @@ export async function PATCH(req: NextRequest) {
   const user = await requireAuthUser(req);
   if (!user) return unauthorizedResponse();
 
-  const body = (await req.json()) as {
+  const rawBody = await req.json().catch(() => null);
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) return NextResponse.json({error:"请求参数无效"},{status:400});
+  const body = rawBody as {
     id?: string;
-    action?: "audit_and_draft" | "update";
+    ids?: string[];
+    action?: "audit_and_draft" | "batch_audit" | "draft_followup" | "approve" | "update";
+    consentStatus?: "unknown" | "opted_in";
+    consentEvidence?: string;
+    expectedSnapshot?: unknown;
     companyName?: string;
     contactName?: string;
     websiteUrl?: string;
@@ -108,6 +117,32 @@ export async function PATCH(req: NextRequest) {
     emailBody?: string;
     status?: "new" | "audited" | "emailed" | "replied" | "converted" | "unsubscribed";
   };
+
+  if (body.action === "batch_audit") {
+    const parsedIds = z.array(z.string().min(1).max(100)).min(1).max(8).safeParse(body.ids);
+    if (!parsedIds.success) return NextResponse.json({error:"请选择1至8条线索进行体检"},{status:400});
+    const baseUrl = getBaseUrl(req);
+    const allLeads = listOutreachLeads(user.id);
+    const targetLeads = allLeads.filter(l => parsedIds.data.includes(l.id));
+
+    if (targetLeads.length === 0) {
+      return NextResponse.json({ error: "没有需要体检的新线索（请确保填写了官网 URL）" }, { status: 400 });
+    }
+
+    let okCount = 0;
+    let failCount = 0;
+    for (const lead of targetLeads) {
+      const r = await auditLeadAndGenerateDraft(lead.id, user.id, baseUrl);
+      if (r.ok) okCount += 1;
+      else failCount += 1;
+    }
+    return NextResponse.json({
+      ok: true,
+      auditedCount: okCount,
+      failedCount: failCount,
+      leads: listOutreachLeads(user.id),
+    });
+  }
 
   if (!body.id) {
     return NextResponse.json({ error: "缺少线索 id" }, { status: 400 });
@@ -119,15 +154,27 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ lead: res.lead });
   }
 
-  const updated = updateOutreachLead(body.id, user.id, {
-    companyName: body.companyName,
-    contactName: body.contactName,
-    websiteUrl: body.websiteUrl,
-    segment: body.segment,
-    emailSubject: body.emailSubject,
-    emailBody: body.emailBody,
-    status: body.status,
-  });
+  if (body.action === "draft_followup") {
+    const res = draftFollowupForLead(body.id, user.id, getBaseUrl(req));
+    if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
+    return NextResponse.json({ lead: res.lead });
+  }
+
+  if (body.action === "approve") {
+    const snapshot = z.object({email:z.string().email(), emailSubject:z.string().max(200), emailBody:z.string().max(20000), consentStatus:z.enum(["unknown","opted_in"]), consentEvidence:z.string().max(1000)}).safeParse(body.expectedSnapshot);
+    if (!snapshot.success) return NextResponse.json({error:"缺少已检查的草稿快照，请重新打开审核"},{status:400});
+    const result = approveOutreachLead(body.id, user.id, snapshot.data);
+    return NextResponse.json(result, {status:result.ok ? 200 : 400});
+  }
+  const fields = z.object({
+    companyName:z.string().min(1).max(120).optional(), contactName:z.string().max(80).optional(),
+    websiteUrl:z.string().max(260).optional(), segment:z.enum(["agency_white_label","saas_growth","strategic_acquirer"]).optional(),
+    emailSubject:z.string().max(200).refine(v=>!/[\r\n]/.test(v)).optional(), emailBody:z.string().max(20000).optional(),
+    status:z.enum(["new","audited","emailed","replied","converted","unsubscribed"]).optional(),
+    consentStatus:z.enum(["unknown","opted_in"]).optional(), consentEvidence:z.string().max(1000).optional()
+  }).safeParse(body);
+  if (!fields.success) return NextResponse.json({error:"线索更新参数无效"},{status:400});
+  const updated = updateOutreachLead(body.id, user.id, fields.data);
   if (!updated) return NextResponse.json({ error: "线索不存在" }, { status: 404 });
   return NextResponse.json({ lead: updated });
 }

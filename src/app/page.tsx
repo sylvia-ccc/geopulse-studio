@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -18,6 +19,15 @@ import { PLAN_QUOTAS } from "@/lib/auth";
 import { PublicAuditWidget } from "@/components/PublicAuditWidget";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website", url: "/", siteName: "GeoPulse Studio",
+    title: "GeoPulse Studio — Open-Source GEO Publishing",
+    description: "Audit crawler access, publish structured content, and manage official API syndication.",
+    images: [{ url: "/api/og", width: 1200, height: 630, alt: "GeoPulse Studio" }],
+  },
+};
 
 export default function LandingPage() {
   const published = listPublishedArticles().slice(0, 6);
@@ -37,7 +47,7 @@ export default function LandingPage() {
         offers: {
           "@type": "AggregateOffer",
           lowPrice: "0",
-          highPrice: "1299",
+          highPrice: String(Math.max(...plans.map((plan) => plan.priceMonthlyCny))),
           priceCurrency: "CNY",
         },
         url: process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://geo.workagentpro.com",
@@ -55,10 +65,10 @@ export default function LandingPage() {
           },
           {
             "@type": "Question",
-            name: "GeoPulse Studio 支持哪些 AI 搜索引擎的权重优化？",
+            name: "GeoPulse Studio 提供哪些内容评分模板？",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "内置豆包/元宝、DeepSeek/Kimi/秘塔、ChatGPT Search、Perplexity AI 与 Google AI Overviews (Gemini) 五大生态的 8 维权重矩阵，并自动生成 Schema.org JSON-LD 与 /llms.txt。",
+              text: "系统提供面向不同编辑目标的 8 维内容评分模板，可调整权重，并生成 Schema.org JSON-LD 与 /llms.txt。评分是本系统的启发式评估，不代表搜索引擎排名、收录或引用概率。",
             },
           },
         ],
@@ -81,7 +91,7 @@ export default function LandingPage() {
             href="/audit"
             className="ml-2 font-bold text-emerald-400 underline hover:text-emerald-300"
           >
-            立即免费秒测 →
+            免费体检 →
           </Link>
         </div>
       )}
@@ -105,7 +115,7 @@ export default function LandingPage() {
 
           <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex">
             <a href="#free-audit" className="hover:text-indigo-600">
-              免费 GEO 秒测
+              免费 GEO 体检
             </a>
             <a href="#weights" className="hover:text-indigo-600">
               AI 权重矩阵
@@ -135,7 +145,7 @@ export default function LandingPage() {
               登录 / 注册
             </Link>
             <Link
-              href="/login?demo=1"
+              href="/login"
               className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
             >
               进入工作台
@@ -151,14 +161,14 @@ export default function LandingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50/70 px-3.5 py-1.5 text-xs font-semibold text-indigo-700">
               <Bot className="h-3.5 w-3.5" />
-              对标 Profound · Scrunch · Peec AI 的开源商用 GEO 平台
+              开源 GEO 内容创作、发布与体检平台
             </div>
             <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:leading-[1.15]">
               输入品牌与产品，按
               <span className="bg-gradient-to-r from-indigo-600 to-emerald-600 bg-clip-text text-transparent">
-                {" "}AI 收录权重{" "}
+                {" "}内容结构评分{" "}
               </span>
-              自动设计与发布高引用文章
+              创建并发布 GEO 文章
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-slate-600">
               面向中小企业、独立开发者与代运营机构：覆盖{" "}
@@ -169,18 +179,18 @@ export default function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
-                href="/login?demo=1"
+                href="/audit"
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-700"
               >
                 <Zap className="h-4 w-4" />
-                一键进入演示工作台（免注册）
+                免费体验 GEO 诊断
               </Link>
               <a
                 href="#free-audit"
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 <Globe2 className="h-4 w-4" />
-                免登录秒测官网 / 文案
+                免登录体检官网 / 文案
               </a>
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-500">
@@ -203,20 +213,20 @@ export default function LandingPage() {
           <div className="mx-auto mt-10 max-w-5xl rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="font-bold text-slate-700">
-                ⚡ 已原生打通全球高付费区官方 API 自动分发网络（支持 Canonical + JSON-LD + /llms.txt）：
+                可配置的官方 API 发布渠道（需授权账户；可用功能取决于平台）：
               </span>
-              <Link href="/login?demo=1" className="font-bold text-indigo-600 hover:underline">
+              <Link href="/login" className="font-bold text-indigo-600 hover:underline">
                 进入托管代发市场体验一键联发 →
               </Link>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {[
                 "🌍 GeoPulse SSR Hub (/llms.txt)",
-                "🇺🇸🇪🇺 DEV.to Official REST (DA 85+)",
-                "🇺🇸🇪🇺 Bluesky ATProto API",
-                "🌍 GitHub Pages API (DA 96+)",
-                "🇯🇵 Qiita Official API v2 (DA 88+)",
-                "🌍 Telegraph Instant Mirror",
+                "DEV.to Official REST API",
+                "Bluesky AT Protocol API",
+                "GitHub Repository API / Pages",
+                "Qiita Official API v2",
+                "Telegraph API",
                 "🇺🇸🇪🇺 Ghost Admin JWT",
                 "🌍 WordPress REST & Webhook",
               ].map((ch) => (
@@ -242,14 +252,14 @@ export default function LandingPage() {
         <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">
-              AI Engine Weight Matrix
+              Content Scoring Templates
             </p>
             <h2 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
-              不同 AI 引擎收录权重差异，一眼看清并可自由微调
+              可调内容评分模板，展示各维度的配比
             </h2>
           </div>
           <p className="max-w-md text-sm text-slate-600">
-            系统内置 5 大 AI 生态的 8 维权重向量，创作时自动按所选引擎配比调整文章结构与评分标准。
+            下列权重是本系统的启发式评分配置，不是搜索引擎公开参数；评分用于辅助内容编辑，不能预测实际收录或引用。
           </p>
         </div>
 
@@ -272,10 +282,10 @@ export default function LandingPage() {
                   </span>
                 </div>
                 <h3 className="mt-3 text-base font-bold text-slate-900">{engine.name}</h3>
-                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{engine.tagline}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">适用于本系统的内容结构检查；可按编辑目标调整维度配比。</p>
 
                 <div className="mt-4 space-y-2.5 border-t border-slate-100 pt-4">
-                  <div className="text-[11px] font-semibold text-slate-500">核心权重 TOP 3</div>
+                  <div className="text-[11px] font-semibold text-slate-500">模板权重 TOP 3</div>
                   {top3.map(([dimId, val]) => {
                     const meta = WEIGHT_DIMENSIONS[dimId as keyof typeof WEIGHT_DIMENSIONS];
                     return (
@@ -305,10 +315,10 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-10 text-center">
             <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-              4 步跑通中小企业 GEO 增长闭环
+              4 步组织品牌内容与发布工作
             </h2>
             <p className="mt-2 text-sm text-slate-600">
-              从官网自动抓档到 AI 竞品声量份额（SOV）追踪，单人 5 分钟完成全流程
+              从品牌资料导入、内容检查到公开发布与引用记录查看，在同一工作台完成。
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-4">
@@ -335,7 +345,7 @@ export default function LandingPage() {
                 icon: Send,
                 step: "04",
                 title: "专栏托管 + 竞品 SOV",
-                desc: "上线 SSR 专栏同步 /llms.txt，一键转知乎/公众号/小红书，并导出白标 PDF 客户报告。",
+                desc: "上线 SSR 专栏并同步 /llms.txt，导出适合手动发布的格式，并打印白标客户报告。",
               },
             ].map((item) => {
               const Icon = item.icon;
@@ -371,7 +381,7 @@ export default function LandingPage() {
             清晰的商用订阅方案，支持自备 API Key 零加价
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            免费版即可长期使用；专业版与旗舰版支持购买激活码秒级开通，也支持企业源码私有化部署
+            免费版即可长期使用；专业版与旗舰版支持购买激活码开通，也支持企业源码私有化部署
           </p>
         </div>
 
@@ -408,7 +418,7 @@ export default function LandingPage() {
                     </span>
                     <span className="text-sm text-slate-500">/ 月</span>
                     <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
-                      {plan.tier === "free" ? "$0/mo" : plan.tier === "pro" ? "≈ $39/mo" : "≈ $149/mo"}
+                      人民币（CNY）计价
                     </span>
                   </div>
                   <ul className="mt-6 space-y-2.5 text-sm text-slate-600">
@@ -418,7 +428,7 @@ export default function LandingPage() {
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      每月 {plan.maxArticlesPerMonth} 篇高权重 GEO 文章额度
+                      每月 {plan.maxArticlesPerMonth} 篇 GEO 文章额度
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -430,7 +440,7 @@ export default function LandingPage() {
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      公开 SSR 专栏 + `/llms.txt` + 白标 PDF 报告
+                      公开 SSR 专栏 + `/llms.txt` + 可打印白标报告
                     </li>
                   </ul>
                 </div>

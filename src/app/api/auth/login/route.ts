@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { findUserByEmail } from "@/lib/db";
-import { sanitizeUser, SESSION_COOKIE_NAME, signSessionToken, verifyPassword } from "@/lib/auth";
+import { DEMO_EMAIL, isDemoUser, sanitizeUser, SESSION_COOKIE_NAME, signSessionToken, verifyPassword } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const loginSchema = z.object({
@@ -27,22 +27,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "登录参数无效" }, { status: 400 });
     }
 
-    let user = null;
-    if (parsed.data.demo) {
-      user = findUserByEmail("demo@geopulse.ai");
-    } else {
-      if (!parsed.data.email || !parsed.data.password) {
-        return NextResponse.json({ error: "请输入邮箱和密码" }, { status: 400 });
-      }
-      const found = findUserByEmail(parsed.data.email);
-      if (!found || !verifyPassword(parsed.data.password, found.passwordHash)) {
-        return NextResponse.json({ error: "邮箱或密码不正确" }, { status: 401 });
-      }
-      user = found;
+    if (parsed.data.demo || parsed.data.email?.trim().toLowerCase() === DEMO_EMAIL) {
+      return NextResponse.json(
+        { error: "公开体验已移至首页；请使用个人账号登录工作台", demoUrl: "/#free-audit" },
+        { status: 403 }
+      );
     }
-
-    if (!user) {
-      return NextResponse.json({ error: "账号不存在" }, { status: 404 });
+    if (!parsed.data.email || !parsed.data.password) {
+      return NextResponse.json({ error: "请输入邮箱和密码" }, { status: 400 });
+    }
+    const user = findUserByEmail(parsed.data.email);
+    if (!user || isDemoUser(user) || !verifyPassword(parsed.data.password, user.passwordHash)) {
+      return NextResponse.json({ error: "邮箱或密码不正确" }, { status: 401 });
     }
 
     const token = signSessionToken(user.id);

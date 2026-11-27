@@ -3,10 +3,14 @@ services:
     build: .
     container_name: geopulse-studio
     restart: unless-stopped
+    mem_limit: 768m
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      - SESSION_SECRET=${SESSION_SECRET:?Set a private SESSION_SECRET in .env}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:?Set the private owner ADMIN_EMAIL in .env}
+      - APP_URL=${APP_URL:?Set APP_URL in .env}
       - GEOPULSE_DATA_DIR=/app/data
     volumes:
       - ./data:/app/data

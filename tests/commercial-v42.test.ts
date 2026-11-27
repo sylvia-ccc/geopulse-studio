@@ -42,9 +42,14 @@ describe("GeoPulse Studio v4.2 Global Blast & Publisher Quality Polish", () => {
     const dbMod = await import("@/lib/db");
     const mkt = await import("@/lib/marketplace");
 
-    const demo = dbMod.findUserByEmail("demo@geopulse.ai")!;
-    const startCredits = demo.creditsBalance;
-    const articles = dbMod.listArticlesByUser(demo.id);
+    process.env.ADMIN_EMAIL = "blast-owner@example.test";
+    const { user: owner } = dbMod.provisionConfiguredOwner({
+      email: process.env.ADMIN_EMAIL, password: "test-owner-password-long-enough",
+      name: "Blast test owner", migrateDemoWorkspace: true,
+    });
+    mkt.adjustUserCredits({ userId: owner.id, delta: 100, reason: "Test wallet funding" });
+    const startCredits = dbMod.findUserById(owner.id)!.creditsBalance;
+    const articles = dbMod.listArticlesByUser(owner.id);
     const geoAcc = mkt.getPlatformAccountWithSecret("pac_geo_hub_official")!; // 10 credits, auto_api
 
     // Create a second auto_api channel with intentionally missing credential to verify proportional auto-refund
@@ -63,7 +68,7 @@ describe("GeoPulse Studio v4.2 Global Blast & Publisher Quality Polish", () => {
     const failingAcc = mkt.getPlatformAccountWithSecret(failingAccPub.id)!;
 
     const blast = await mkt.submitGlobalBlastOrder({
-      userId: demo.id,
+      userId: owner.id,
       article: articles[0],
       accounts: [geoAcc, failingAcc],
       baseUrl: "https://geo.workagentpro.com",

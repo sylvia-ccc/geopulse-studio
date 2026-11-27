@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, Bot, Building2, CheckCircle2, ExternalLink, Sparkles } from "lucide-react";
 import { getBrandById, getPublishedArticleBySlug, incrementArticleViews } from "@/lib/db";
 import { markdownToCleanHtml } from "@/lib/geo/generator";
 import { AI_ENGINES } from "@/lib/geo/weights";
+import { shouldExcludeTelemetry, recordTelemetryEvent } from "@/lib/telemetry";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,10 @@ export async function generateMetadata(context: {
   if (!article) {
     return { title: "文章未找到 — GeoPulse Studio" };
   }
+  const canonical = `/p/${encodeURIComponent(article.slug)}`;
+  const image = `/api/og?title=${encodeURIComponent(article.title)}`;
   return {
+    alternates: { canonical },
     title: `${article.title} — GeoPulse GEO Hub`,
     description: article.summary || article.directAnswerCapsule,
     keywords: article.targetKeyword,
@@ -24,6 +29,14 @@ export async function generateMetadata(context: {
       title: article.title,
       description: article.summary || article.directAnswerCapsule,
       type: "article",
+      url: canonical,
+      images: [{ url: image, width: 1200, height: 630, alt: article.title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description: article.summary || article.directAnswerCapsule,
+      images: [image],
     },
   };
 }
@@ -37,7 +50,16 @@ export default async function PublicGeoArticlePage(context: {
     notFound();
   }
 
-  incrementArticleViews(article.id);
+  const hdrs = await headers();
+  if (!shouldExcludeTelemetry(hdrs)) incrementArticleViews(article.id);
+  recordTelemetryEvent({
+    headers: hdrs,
+    eventType: "article_view",
+    path: `/p/${article.slug}`,
+    userAgent: hdrs.get("user-agent") || "",
+    referer: hdrs.get("referer") || "",
+    meta: `GEO ${article.geoScore}/100`,
+  });
   const brand = getBrandById(article.brandId);
   const bodyHtml = markdownToCleanHtml(article.markdownContent);
 

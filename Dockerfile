@@ -29,6 +29,7 @@ RUN mkdir -p /app/data \
 
 COPY --from=builder --chown=1000:1000 /app/.next/standalone ./
 COPY --from=builder --chown=1000:1000 /app/.next/static ./.next/static
+COPY --from=builder --chown=1000:1000 /app/.next/owner-bootstrap.cjs ./scripts/bootstrap-owner.cjs
 
 USER 1000
 VOLUME ["/app/data"]

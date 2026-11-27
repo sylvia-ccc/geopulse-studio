@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUserId } from "./auth";
+import { getSessionUserId, isDemoUser } from "./auth";
 import { findUserByApiKey, findUserById, type UserWithSecret } from "./db";
 
 export async function requireAuthUser(req: NextRequest): Promise<UserWithSecret | null> {
@@ -12,13 +12,14 @@ export async function requireAuthUser(req: NextRequest): Promise<UserWithSecret 
 
   if (apiKeyHeader) {
     const userByKey = findUserByApiKey(apiKeyHeader);
-    if (userByKey) return userByKey;
+    if (userByKey) return isDemoUser(userByKey) ? null : userByKey;
   }
 
   // 2. Signed HTTP-only session cookie
   const userId = await getSessionUserId();
   if (!userId) return null;
-  return findUserById(userId);
+  const user = findUserById(userId);
+  return user && !isDemoUser(user) ? user : null;
 }
 
 export function unauthorizedResponse() {

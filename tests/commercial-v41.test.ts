@@ -113,21 +113,23 @@ describe("GeoPulse Studio v4.1 Global Official-API Auto-Distribution Engine", ()
     expect(extractCleanTags("2026 Open Source GEO Tool!", 4)).toHaveLength(4);
   });
 
-  it("seeds 5 bilingual official GeoPulse growth pack articles (3 ZH + 2 EN) all scoring >= 80", async () => {
-    const { findUserByEmail } = await import("../src/lib/db");
+  it("seeds five evidence research drafts without publishing or inventing benchmarks", async () => {
+    const db = await import("../src/lib/db");
     const { seedOfficialGeoGrowthPack } = await import("../src/lib/marketplace");
-
-    const demo = findUserByEmail("demo@geopulse.ai")!;
+    const demo = db.findUserByEmail("demo@geopulse.ai")!;
+    const before = db.getDb().prepare("SELECT COUNT(*) AS n FROM articles WHERE status = 'published'").get()?.n;
     const pack = seedOfficialGeoGrowthPack(demo.id, "https://geo.workagentpro.com");
-    expect(pack.articles.length).toBe(5);
-    expect(
-      pack.articles.some((a) => a.slug === "2026-best-open-source-geo-tools-profound-otterly-alternative")
-    ).toBe(true);
-    expect(
-      pack.articles.some((a) => a.slug === "llms-txt-json-ld-ai-search-visibility-checklist-2026")
-    ).toBe(true);
-    for (const a of pack.articles) {
-      expect(a.geoScore).toBeGreaterThanOrEqual(85);
+    expect(pack.createdCount).toBe(5);
+    expect(pack.articles).toHaveLength(5);
+    for (const spec of pack.articles) {
+      const article = db.listArticlesByUser(demo.id).find((item) => item.slug === spec.slug)!;
+      expect(article.status).toBe("draft");
+      expect(article.publishedAt).toBeNull();
+      expect(article.markdownContent).toContain("autopilot-review-required");
+      expect(article.markdownContent).toContain("https://");
+      expect(article.markdownContent).not.toMatch(/99–|1,500|96\/100|3 to 14 days|40%/);
     }
+    expect(db.getDb().prepare("SELECT COUNT(*) AS n FROM articles WHERE status = 'published'").get()?.n).toBe(before);
+    expect(seedOfficialGeoGrowthPack(demo.id, "https://geo.workagentpro.com").createdCount).toBe(0);
   });
 });

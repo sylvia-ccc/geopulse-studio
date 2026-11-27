@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppShell } from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "工作台",
+  robots: { index: false, follow: false, nocache: true },
+};
 
 export default function AppWorkspacePage() {
   return (

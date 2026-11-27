@@ -329,7 +329,7 @@ export interface GrowthTopic {
   language: "en" | "zh";
   archetype: ArticleArchetype;
   targetAccountIds: string[];
-  status: "queued" | "published" | "failed";
+  status: "queued" | "processing" | "review_pending" | "published" | "failed";
   articleId: string;
   publishedUrls: string[];
   errorMsg: string;
@@ -347,16 +347,45 @@ export interface OutreachLead {
   email: string;
   websiteUrl: string;
   segment: OutreachSegment;
+  source: "manual" | "inbound_audit";
+  priorityTier: "A" | "B" | "C" | "";
   auditScore: number | null;
   auditGrade: string;
   auditMissing: string[];
   emailSubject: string;
   emailBody: string;
   status: "new" | "audited" | "emailed" | "replied" | "converted" | "unsubscribed";
+  clickCount: number;
+  lastClickedAt: string | null;
+  followupCount: number;
   lastSentAt: string | null;
+  consentStatus: "unknown" | "opted_in";
+  consentEvidence: string;
+  approvedAt: string | null;
+  approvalHash: string;
   unsubscribed: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TelemetrySummary {
+  totalEvents7d: number;
+  aiCrawlerHits7d: number;
+  publicAudits7d: number;
+  inboundLeads7d: number;
+  outreachClicks7d: number;
+  articleViews7d: number;
+  reportViews7d: number;
+  botBreakdown: Array<{ botName: string; count: number; lastSeen: string }>;
+  topPaths: Array<{ path: string; count: number }>;
+  recentEvents: Array<{
+    id: string;
+    eventType: string;
+    path: string;
+    botName: string;
+    meta: string;
+    createdAt: string;
+  }>;
 }
 
 export interface OutreachEmailConfig {

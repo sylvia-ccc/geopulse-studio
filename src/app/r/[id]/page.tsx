@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   getBrandById,
@@ -7,10 +9,16 @@ import {
   listPublishLogs,
 } from "@/lib/db";
 import { AI_ENGINE_LIST, AI_ENGINES } from "@/lib/geo/weights";
+import { recordTelemetryEvent } from "@/lib/telemetry";
 import { verifyWhiteLabelReportToken } from "@/lib/white-label";
 import { PrintReportButton } from "./PrintReportButton";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Private client report",
+  robots: { index: false, follow: false, nocache: true },
+  referrer: "no-referrer",
+};
 
 export default async function ShareableWhiteLabelReportPage(context: {
   params: Promise<{ id: string }>;
@@ -23,6 +31,16 @@ export default async function ShareableWhiteLabelReportPage(context: {
   if (!brand || !token || !verifyWhiteLabelReportToken(brand.id, brand.userId, token)) {
     notFound();
   }
+
+  const hdrs = await headers();
+  recordTelemetryEvent({
+    headers: hdrs,
+    eventType: "report_view",
+    path: `/r/${brand.id}`,
+    userAgent: hdrs.get("user-agent") || "",
+    referer: hdrs.get("referer") || "",
+    meta: `White-Label Report: ${brand.name}`,
+  });
 
   const siteCfg = getCommercialSiteSettings();
   const articles = listArticlesByUser(brand.userId, brand.id);
