@@ -1,0 +1,14 @@
+services:
+  geopulse-studio:
+    build: .
+    container_name: geopulse-studio
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_APP_URL=https://geo.yourdomain.com
+      - SESSION_SECRET=change-this-to-a-64-char-random-secret
+      - GEOPULSE_DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data
