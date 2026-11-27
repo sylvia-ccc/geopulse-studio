@@ -100,6 +100,11 @@ describe("Reviewed outreach durable send ledger",()=>{
     out.markEmailUnsubscribed(lead!.email);
     expect(out.captureInboundAuditLead({email:lead!.email,websiteUrl:"https://example.com",baseUrl:"https://geo.example",consent:true})?.unsubscribed).toBe(true);
   });
+  it("captures a consented content audit without a website URL",()=>{
+    const lead=out.captureInboundAuditLead({email:"content@permission.example",websiteUrl:"",baseUrl:"https://geo.example",consent:true,auditScore:64});
+    expect(lead?.companyName).toBe("Content audit request");
+    expect(lead?.clickCount).toBe(0);
+  });
   it("rejects tenant attempting to use global provider key",async()=>{
     const user=db.createUser({email:"tenant@mail51.example",password:"another-valid-password",name:"Tenant"});
     const lead=out.createOutreachLead(user.id,{companyName:"Tenant",email:"recipient@example.com"});

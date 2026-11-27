@@ -572,7 +572,7 @@ export function captureInboundAuditLead(params: {
   // Never overwrite a previously approved draft or remove an unsubscribe suppression.
   const existing = getDb().prepare("SELECT id FROM outreach_leads WHERE user_id = ? AND LOWER(email) = ? LIMIT 1").get(admin.id, cleanEmail);
   if (existing) return getOutreachLeadById(String(existing.id));
-  const domain = new URL(params.websiteUrl).hostname;
+  const domain = params.websiteUrl ? new URL(params.websiteUrl).hostname : "Content audit request";
   const lead = createOutreachLead(admin.id, {companyName: domain, email: cleanEmail, websiteUrl: params.websiteUrl, segment: "saas_growth"});
   const now = new Date().toISOString();
   getDb().prepare(`UPDATE outreach_leads SET source='inbound_audit', consent_status='opted_in', consent_evidence=?, audit_score=?, audit_grade=?, audit_missing_json=?, priority_tier=?, updated_at=? WHERE id=?`)

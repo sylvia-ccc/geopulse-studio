@@ -10,7 +10,7 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:owner": "esbuild scripts/bootstrap-owner.ts --bundle --platform=node --format=cjs --packages=external --outfile=.next/owner-bootstrap.cjs",
+    "build:owner": "esbuild scripts/bootstrap-owner.ts --bundle --platform=node --format=cjs --external:next/headers --outfile=.next/owner-bootstrap.cjs",
     "owner:bootstrap": "node .next/owner-bootstrap.cjs"
   },
   "dependencies": {
