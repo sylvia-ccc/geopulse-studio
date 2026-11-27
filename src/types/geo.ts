@@ -211,13 +211,74 @@ export interface CitationCheck {
 export interface RedemptionCode {
   id: string;
   code: string;
+  codeType: "plan" | "credits";
   plan: PlanTier;
   durationDays: number;
+  creditsAmount: number;
   status: "active" | "redeemed" | "revoked";
   redeemedByUserId: string | null;
   redeemedByEmail: string | null;
   redeemedAt: string | null;
   note: string;
+  createdAt: string;
+}
+
+export type PlatformAccountType =
+  | "geo_network"
+  | "wordpress"
+  | "devto"
+  | "webhook"
+  | "zhihu_managed"
+  | "wechat_managed"
+  | "xiaohongshu_managed"
+  | "bundle_managed";
+
+export interface PlatformAccount {
+  id: string;
+  name: string;
+  platformType: PlatformAccountType;
+  deliveryMode: "auto_api" | "managed_review";
+  handleOrDomain: string;
+  authorityBadge: string;
+  description: string;
+  creditCost: number;
+  endpointUrl: string;
+  authHeader: string;
+  hasCredential: boolean;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface DistributionOrder {
+  id: string;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  articleId: string;
+  articleTitle?: string;
+  articleSlug?: string;
+  articleGeoScore?: number;
+  platformAccountId: string;
+  platformName: string;
+  platformType: PlatformAccountType;
+  deliveryMode: "auto_api" | "managed_review";
+  creditsCharged: number;
+  status: "pending_review" | "published" | "rejected" | "failed";
+  publishedUrl: string;
+  customerNote: string;
+  adminNote: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditTransaction {
+  id: string;
+  userId: string;
+  delta: number;
+  balanceAfter: number;
+  reason: string;
+  refId: string;
   createdAt: string;
 }
 
@@ -229,6 +290,7 @@ export interface UserAccount {
   role: UserRole;
   plan: PlanTier;
   planExpiresAt: string | null;
+  creditsBalance: number;
   apiKey: string;
   llmProvider: "none" | "openai" | "deepseek" | "gemini" | "custom";
   llmBaseUrl: string;

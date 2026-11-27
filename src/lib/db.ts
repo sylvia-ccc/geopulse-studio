@@ -198,6 +198,53 @@ function openDatabase(): SqliteDatabase {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS platform_accounts (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      platform_type TEXT NOT NULL,
+      delivery_mode TEXT NOT NULL DEFAULT 'managed_review',
+      handle_or_domain TEXT NOT NULL DEFAULT '',
+      authority_badge TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      credit_cost INTEGER NOT NULL DEFAULT 20,
+      endpoint_url TEXT NOT NULL DEFAULT '',
+      auth_header TEXT NOT NULL DEFAULT '',
+      credential_enc TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 10,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS distribution_orders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      article_id TEXT NOT NULL,
+      platform_account_id TEXT NOT NULL,
+      platform_name TEXT NOT NULL,
+      platform_type TEXT NOT NULL,
+      delivery_mode TEXT NOT NULL,
+      credits_charged INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending_review',
+      published_url TEXT NOT NULL DEFAULT '',
+      customer_note TEXT NOT NULL DEFAULT '',
+      admin_note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS credit_transactions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      delta INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      ref_id TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   // Safe forward migrations for existing production SQLite databases
@@ -209,6 +256,9 @@ function openDatabase(): SqliteDatabase {
   };
   ensureColumn("users", "role", "TEXT NOT NULL DEFAULT 'user'");
   ensureColumn("users", "plan_expires_at", "TEXT");
+  ensureColumn("users", "credits_balance", "INTEGER NOT NULL DEFAULT 20");
+  ensureColumn("redemption_codes", "code_type", "TEXT NOT NULL DEFAULT 'plan'");
+  ensureColumn("redemption_codes", "credits_amount", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("citation_checks", "source_domain", "TEXT NOT NULL DEFAULT ''");
   ensureColumn("citation_checks", "competitors_mentioned_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn("citation_checks", "has_hallucination", "INTEGER NOT NULL DEFAULT 0");
@@ -220,8 +270,14 @@ function openDatabase(): SqliteDatabase {
     seedDemoDataIfEmpty(db);
   }
 
+  // Ensure default platform publishing marketplace slots exist even on upgraded production DBs
+  seedDefaultPlatformAccountsIfEmpty(db);
+
   // Ensure demo account and configured ADMIN_EMAIL always hold admin role
   db.prepare("UPDATE users SET role = 'admin' WHERE email = 'demo@geopulse.ai'").run();
+  db.prepare(
+    "UPDATE users SET credits_balance = 200 WHERE email = 'demo@geopulse.ai' AND credits_balance <= 20"
+  ).run();
   if (process.env.ADMIN_EMAIL) {
     db.prepare("UPDATE users SET role = 'admin' WHERE email = ?").run(
       process.env.ADMIN_EMAIL.toLowerCase().trim()
@@ -262,6 +318,7 @@ function mapUser(row: Record<string, unknown>): UserWithSecret {
     role: String(row.role || "user") as UserRole,
     plan: (String(row.plan || "free") as PlanTier),
     planExpiresAt: row.plan_expires_at ? String(row.plan_expires_at) : null,
+    creditsBalance: Number(row.credits_balance ?? 20),
     apiKey: String(row.api_key),
     llmProvider: String(row.llm_provider || "none") as UserAccount["llmProvider"],
     llmBaseUrl: String(row.llm_base_url || ""),
@@ -394,8 +451,10 @@ function mapRedemptionCode(row: Record<string, unknown>): RedemptionCode {
   return {
     id: String(row.id),
     code: String(row.code),
-    plan: String(row.plan) as PlanTier,
+    codeType: (String(row.code_type || "plan") as RedemptionCode["codeType"]),
+    plan: String(row.plan || "pro") as PlanTier,
     durationDays: Number(row.duration_days || 30),
+    creditsAmount: Number(row.credits_amount || 0),
     status: String(row.status) as RedemptionCode["status"],
     redeemedByUserId: row.redeemed_by_user_id ? String(row.redeemed_by_user_id) : null,
     redeemedByEmail: row.redeemed_by_email ? String(row.redeemed_by_email) : null,
@@ -938,14 +997,34 @@ export function deleteCitationCheck(id: string, userId: string): boolean {
 // ---------------- Commercial Licensing / Admin Repository ----------------
 
 export function createRedemptionCodes(params: {
-  plan: PlanTier;
-  durationDays: number;
+  codeType?: "plan" | "credits";
+  plan?: PlanTier;
+  durationDays?: number;
+  creditsAmount?: number;
   count: number;
   note?: string;
 }): RedemptionCode[] {
   const now = new Date().toISOString();
   const created: RedemptionCode[] = [];
-  const prefix = params.plan === "enterprise" ? "ENT" : params.plan === "pro" ? "PRO" : "FREE";
+  const codeType = params.codeType || "plan";
+  const plan = params.plan || "pro";
+  const durationDays = params.durationDays ?? 30;
+  const creditsAmount =
+    codeType === "credits"
+      ? Math.max(10, params.creditsAmount ?? 100)
+      : plan === "enterprise"
+        ? 300
+        : plan === "pro"
+          ? 50
+          : 0;
+  const prefix =
+    codeType === "credits"
+      ? "CRD"
+      : plan === "enterprise"
+        ? "ENT"
+        : plan === "pro"
+          ? "PRO"
+          : "FREE";
   const safeCount = Math.min(50, Math.max(1, params.count));
 
   for (let i = 0; i < safeCount; i++) {
@@ -955,10 +1034,10 @@ export function createRedemptionCodes(params: {
     const code = `GP-${prefix}-${randA}-${randB}`;
     getDb()
       .prepare(
-        `INSERT INTO redemption_codes (id, code, plan, duration_days, status, note, created_at)
-         VALUES (?, ?, ?, ?, 'active', ?, ?)`
+        `INSERT INTO redemption_codes (id, code, code_type, plan, duration_days, credits_amount, status, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`
       )
-      .run(id, code, params.plan, params.durationDays, (params.note || "").trim(), now);
+      .run(id, code, codeType, plan, durationDays, creditsAmount, (params.note || "").trim(), now);
     const row = getDb().prepare("SELECT * FROM redemption_codes WHERE id = ?").get(id);
     if (row) created.push(mapRedemptionCode(row));
   }
@@ -982,7 +1061,17 @@ export function revokeRedemptionCode(id: string): boolean {
 export function redeemActivationCode(
   userId: string,
   rawCode: string
-): { ok: true; plan: PlanTier; expiresAt: string; durationDays: number } | { ok: false; error: string } {
+):
+  | {
+      ok: true;
+      codeType: "plan" | "credits";
+      plan: PlanTier;
+      expiresAt: string | null;
+      durationDays: number;
+      creditsAdded: number;
+      creditsBalance: number;
+    }
+  | { ok: false; error: string } {
   const normalized = rawCode.trim().toUpperCase();
   const row = getDb().prepare("SELECT * FROM redemption_codes WHERE code = ?").get(normalized);
   if (!row) {
@@ -1000,6 +1089,43 @@ export function redeemActivationCode(
   if (!user) return { ok: false, error: "用户不存在" };
 
   const now = new Date();
+  const db = getDb();
+
+  db.prepare(
+    `UPDATE redemption_codes SET status = 'redeemed', redeemed_by_user_id = ?, redeemed_by_email = ?, redeemed_at = ?
+     WHERE id = ? AND status = 'active'`
+  ).run(user.id, user.email, now.toISOString(), rec.id);
+
+  let nextBalance = user.creditsBalance ?? 0;
+  if (rec.creditsAmount > 0) {
+    nextBalance += rec.creditsAmount;
+    db.prepare("UPDATE users SET credits_balance = ? WHERE id = ?").run(nextBalance, user.id);
+    db.prepare(
+      `INSERT INTO credit_transactions (id, user_id, delta, balance_after, reason, ref_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      newId("ctx"),
+      user.id,
+      rec.creditsAmount,
+      nextBalance,
+      rec.codeType === "credits" ? `积分卡密充值（${rec.code}）` : `套餐激活赠送发布积分（${rec.code}）`,
+      rec.id,
+      now.toISOString()
+    );
+  }
+
+  if (rec.codeType === "credits") {
+    return {
+      ok: true,
+      codeType: "credits",
+      plan: user.plan,
+      expiresAt: user.planExpiresAt,
+      durationDays: 0,
+      creditsAdded: rec.creditsAmount,
+      creditsBalance: nextBalance,
+    };
+  }
+
   const baseDate =
     user.planExpiresAt && new Date(user.planExpiresAt).getTime() > now.getTime()
       ? new Date(user.planExpiresAt)
@@ -1008,19 +1134,118 @@ export function redeemActivationCode(
     baseDate.getTime() + rec.durationDays * 24 * 60 * 60 * 1000
   ).toISOString();
 
-  getDb()
-    .prepare(
-      `UPDATE redemption_codes SET status = 'redeemed', redeemed_by_user_id = ?, redeemed_by_email = ?, redeemed_at = ?
-       WHERE id = ? AND status = 'active'`
-    )
-    .run(user.id, user.email, now.toISOString(), rec.id);
-
   updateUserSettings(user.id, {
     plan: rec.plan,
     planExpiresAt: expiresAt,
   });
 
-  return { ok: true, plan: rec.plan, expiresAt, durationDays: rec.durationDays };
+  return {
+    ok: true,
+    codeType: "plan",
+    plan: rec.plan,
+    expiresAt,
+    durationDays: rec.durationDays,
+    creditsAdded: rec.creditsAmount,
+    creditsBalance: nextBalance,
+  };
+}
+
+function seedDefaultPlatformAccountsIfEmpty(db: SqliteDatabase) {
+  const existing = db.prepare("SELECT COUNT(*) as cnt FROM platform_accounts").get();
+  if (Number(existing?.cnt || 0) > 0) return;
+
+  const now = new Date().toISOString();
+  const defaults = [
+    {
+      id: "pac_geo_hub_official",
+      name: "GeoPulse 官方高权重 GEO 精选专栏",
+      platformType: "geo_network",
+      deliveryMode: "auto_api",
+      handleOrDomain: "geo.workagentpro.com/hub",
+      authorityBadge: "即时自动上线 · /llms.txt 全网索引",
+      description:
+        "实时发布至 SSR 公开专栏并嵌入四合一 JSON-LD，自动写入 /llms.txt 与 /sitemap.xml，全面放行 6 大 AI 引擎爬虫。",
+      creditCost: 10,
+      sortOrder: 1,
+    },
+    {
+      id: "pac_zhihu_eval",
+      name: "知乎 · 商业与数字化客观评测号",
+      platformType: "zhihu_managed",
+      deliveryMode: "managed_review",
+      handleOrDomain: "知乎认证专栏矩阵（平台自营）",
+      authorityBadge: "DeepSeek / 豆包 / Kimi 极高权重源",
+      description:
+        "无需自己养知乎账号！平台审核通过后发布至垂直客观评测专栏，24 小时内回传真实知乎链接（未通过自动全额退积分）。",
+      creditCost: 39,
+      sortOrder: 2,
+    },
+    {
+      id: "pac_wechat_growth",
+      name: "微信公众号 · 企业增长实战矩阵",
+      platformType: "wechat_managed",
+      deliveryMode: "managed_review",
+      handleOrDomain: "认证服务号/订阅号矩阵",
+      authorityBadge: "腾讯元宝 / 微信 AI 搜索核心信源",
+      description:
+        "自动转为公众号富文本排版并经编辑审核后发至合作/自营垂直号，显著提升微信生态与国内大模型提及率。",
+      creditCost: 49,
+      sortOrder: 3,
+    },
+    {
+      id: "pac_xhs_review",
+      name: "小红书 · 消费与效率工具实测号",
+      platformType: "xiaohongshu_managed",
+      deliveryMode: "managed_review",
+      handleOrDomain: "小红书测评笔记矩阵",
+      authorityBadge: "消费决策 & 豆包种草高引源",
+      description:
+        "提炼核心卖点、对比表与避坑指南，以真实测评口吻发布至垂直好物/工具测评号，回传笔记链接。",
+      creditCost: 35,
+      sortOrder: 4,
+    },
+    {
+      id: "pac_bundle_3x",
+      name: "全网 3 渠道 GEO 组合代发包（专栏 + 知乎 + 公众号）",
+      platformType: "bundle_managed",
+      deliveryMode: "managed_review",
+      handleOrDomain: "3 大核心高权源联动共现",
+      authorityBadge: "省 20% · 多信源共现效果最佳",
+      description:
+        "单篇文章一次覆盖 SSR 专栏 + 知乎 + 微信公众号，建立多平台品牌实体共现，大幅加速 AI 收录与推荐。",
+      creditCost: 79,
+      sortOrder: 5,
+    },
+  ];
+
+  for (const a of defaults) {
+    db.prepare(
+      `INSERT INTO platform_accounts (
+        id, name, platform_type, delivery_mode, handle_or_domain, authority_badge,
+        description, credit_cost, endpoint_url, auth_header, credential_enc, enabled, sort_order, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', '', '', 1, ?, ?)`
+    ).run(
+      a.id,
+      a.name,
+      a.platformType,
+      a.deliveryMode,
+      a.handleOrDomain,
+      a.authorityBadge,
+      a.description,
+      a.creditCost,
+      a.sortOrder,
+      now
+    );
+  }
+
+  // Also ensure a sample credit top-up code exists for testing
+  const hasCrd = db.prepare("SELECT id FROM redemption_codes WHERE code = 'GP-CRD-2026-100C'").get();
+  if (!hasCrd) {
+    db.prepare(
+      `INSERT INTO redemption_codes (id, code, code_type, plan, duration_days, credits_amount, status, note, created_at)
+       VALUES (?, 'GP-CRD-2026-100C', 'credits', 'free', 0, 100, 'active', '100 积分托管代发体验充值码', ?)`
+    ).run(newId("cd"), now);
+  }
 }
 
 export function listAllUsersForAdmin() {

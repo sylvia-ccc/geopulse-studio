@@ -26,8 +26,10 @@ export async function GET(req: NextRequest) {
 }
 
 const createCodeSchema = z.object({
+  codeType: z.enum(["plan", "credits"]).default("plan"),
   plan: z.enum(["pro", "enterprise"]).default("pro"),
-  durationDays: z.number().int().min(7).max(3650).default(30),
+  durationDays: z.number().int().min(0).max(3650).default(30),
+  creditsAmount: z.number().int().min(0).max(100000).optional(),
   count: z.number().int().min(1).max(50).default(5),
   note: z.string().max(120).optional().default(""),
 });

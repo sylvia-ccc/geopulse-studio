@@ -78,7 +78,9 @@ export function SettingsView({ user, plans, siteConfig, onRefresh, onNotify }: P
       setRedeemCode("");
       await onRefresh();
       onNotify(
-        `激活成功！已升级为 ${String(data.plan).toUpperCase()}（有效期 +${data.durationDays} 天）`
+        data.codeType === "credits"
+          ? `积分充值成功！已到账 +${data.creditsAdded} 发布积分（当前余额 ${data.creditsBalance}）`
+          : `激活成功！已升级为 ${String(data.plan).toUpperCase()}（有效期 +${data.durationDays} 天${data.creditsAdded ? `，赠送 +${data.creditsAdded} 积分` : ""}）`
       );
     } catch (err) {
       onNotify(err instanceof Error ? err.message : "兑换失败", "error");

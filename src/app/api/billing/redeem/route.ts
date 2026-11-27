@@ -38,9 +38,12 @@ export async function POST(req: NextRequest) {
   const updated = findUserById(user.id)!;
   return NextResponse.json({
     ok: true,
+    codeType: result.codeType,
     plan: result.plan,
     durationDays: result.durationDays,
     expiresAt: result.expiresAt,
+    creditsAdded: result.creditsAdded,
+    creditsBalance: result.creditsBalance,
     user: sanitizeUser(updated),
     quota: PLAN_QUOTAS[updated.plan],
   });

@@ -6,12 +6,14 @@ import Link from "next/link";
 import {
   Building2,
   CheckCircle2,
+  Coins,
   ExternalLink,
   Globe2,
   LayoutDashboard,
   Loader2,
   LogOut,
   Radar,
+  Rocket,
   Send,
   Settings,
   Shield,
@@ -33,6 +35,7 @@ import { DashboardView } from "./views/DashboardView";
 import { BrandsView } from "./views/BrandsView";
 import { StudioView } from "./views/StudioView";
 import { PublishView } from "./views/PublishView";
+import { MarketplaceView } from "./views/MarketplaceView";
 import { MonitorView } from "./views/MonitorView";
 import { SiteAuditView } from "./views/SiteAuditView";
 import { AdminView } from "./views/AdminView";
@@ -47,6 +50,7 @@ interface MeResponse {
     role: UserRole;
     plan: PlanTier;
     planExpiresAt: string | null;
+    creditsBalance: number;
     apiKey: string;
     llmProvider: "none" | "openai" | "deepseek" | "gemini" | "custom";
     llmBaseUrl: string;
@@ -73,6 +77,7 @@ type TabId =
   | "brands"
   | "studio"
   | "publish"
+  | "marketplace"
   | "monitor"
   | "audit"
   | "settings"
@@ -83,6 +88,7 @@ const BASE_NAV_ITEMS: Array<{ id: TabId; label: string; icon: typeof LayoutDashb
   { id: "brands", label: "品牌实体库", icon: Building2 },
   { id: "studio", label: "GEO 创作工坊", icon: Sparkles },
   { id: "publish", label: "多渠道发布中心", icon: Send },
+  { id: "marketplace", label: "托管代发市场", icon: Rocket },
   { id: "monitor", label: "AI 收录与 SOV", icon: Radar },
   { id: "audit", label: "官网 AI 体检", icon: Globe2 },
   { id: "settings", label: "设置与配额", icon: Settings },
@@ -234,8 +240,20 @@ export function AppShell() {
           })}
         </nav>
 
-        {/* Quota & Public Links */}
+        {/* Quota & Credits & Public Links */}
         <div className="border-t border-slate-100 p-4 space-y-3">
+          <button
+            type="button"
+            onClick={() => setTab("marketplace")}
+            className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100/70"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Coins className="h-3.5 w-3.5 text-amber-600" />
+              发布积分
+            </span>
+            <span>{me.user.creditsBalance ?? 0} 分</span>
+          </button>
+
           <div className="rounded-xl bg-slate-50 p-3 text-xs">
             <div className="flex items-center justify-between font-semibold text-slate-700">
               <span>本月文章配额</span>
@@ -378,6 +396,19 @@ export function AppShell() {
             />
           )}
 
+          {tab === "marketplace" && (
+            <MarketplaceView
+              brands={brands}
+              articles={articles}
+              onRefreshGlobal={refreshAll}
+              onGoStudio={(artId) => {
+                setStudioArticleId(artId);
+                setTab("studio");
+              }}
+              onNotify={notify}
+            />
+          )}
+
           {tab === "monitor" && (
             <MonitorView
               brands={brands}
@@ -393,7 +424,9 @@ export function AppShell() {
 
           {tab === "audit" && <SiteAuditView brands={brands} onNotify={notify} />}
 
-          {tab === "admin" && me.user.role === "admin" && <AdminView onNotify={notify} />}
+          {tab === "admin" && me.user.role === "admin" && (
+            <AdminView onRefreshGlobal={refreshAll} onNotify={notify} />
+          )}
 
           {tab === "settings" && (
             <SettingsView

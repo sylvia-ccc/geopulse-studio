@@ -121,6 +121,7 @@ export function sanitizeUser(user: UserAccount & { passwordHash?: string }) {
     role: user.role,
     plan: user.plan,
     planExpiresAt: user.planExpiresAt,
+    creditsBalance: user.creditsBalance ?? 0,
     apiKey: user.apiKey,
     llmProvider: user.llmProvider,
     llmBaseUrl: user.llmBaseUrl,
